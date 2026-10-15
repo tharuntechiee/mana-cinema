@@ -1,0 +1,176 @@
+/* =========================================================
+   Lists page (lists.html, js/lists.js): all-time top grossers and
+   biggest opening days, one language at a time.
+   Builds on css/style.css tokens and components. District anatomy:
+   sentence-case title, pill tabs (the current one a tinted --gold pill),
+   a segmented switch, flat hairline tables that turn into cards on phones.
+   ========================================================= */
+
+/* ---------- Header ---------- */
+.lists-head { padding: 48px 0 0; }
+.lists-head h1 { font-size: var(--fs-hero); line-height: 1.2; letter-spacing: -1px; }
+.lists-intro { margin-top: 10px; color: var(--text-soft); font-size: var(--fs-body); line-height: 1.65; max-width: 62ch; }
+.lists-intro span { white-space: nowrap; }   /* "15 Oct 2026" stays on one line */
+
+/* ---------- Language tabs ---------- */
+/* One row of pill tabs. The negative margin lines the first label up with the title instead of the pill's edge;
+   the row scrolls sideways inside itself when the languages don't fit. */
+.lang-tabs { margin-top: 28px; border-bottom: 1px solid var(--border); }
+.lang-tab-row {
+  display: flex; gap: 4px; list-style: none; padding: 10px 0; margin-inline: -14px;
+  overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+}
+.lang-tab-row::-webkit-scrollbar { display: none; }
+.lang-tab-row li { flex: 0 0 auto; }
+.lang-tab {
+  display: block; padding: 8px 14px; border-radius: 999px; white-space: nowrap;
+  color: var(--text-soft); font-size: var(--fs-small); font-weight: 600; line-height: 1.45;
+  transition: color .2s, background .2s;
+}
+.lang-tab:hover { color: var(--text); background: var(--ghost); }
+.lang-tab[aria-current="page"] { color: var(--gold-ink); background: rgba(var(--gold-rgb), .2); }
+.lang-tab:focus-visible { outline-offset: -2px; }   /* inside the scroller, so the ring isn't clipped */
+
+/* ---------- List switch and basis line ---------- */
+.lists-bar { display: grid; justify-items: start; gap: 14px; margin-top: 24px; }
+.list-seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--ghost); }
+.seg-link {
+  display: block; padding: 8px 18px; border-radius: 999px; white-space: nowrap; text-align: center;
+  color: var(--text-soft); font-size: var(--fs-small); font-weight: 600; line-height: 1.45;
+  transition: color .2s, background .2s;
+}
+.seg-link::first-letter { text-transform: uppercase; }   /* "Top grossers" when the first word drops out on phones */
+.seg-link:hover { color: var(--text); }
+.seg-link[aria-current="page"] { background: var(--text); color: var(--bg); }
+.seg-link:focus-visible { outline-offset: 1px; }
+.lists-basis {
+  display: flex; align-items: flex-start; gap: 8px; max-width: 86ch;
+  color: var(--muted); font-size: var(--fs-small); font-weight: 500; line-height: 1.55;
+}
+.lists-basis svg.lucide { width: 15px; height: 15px; margin-top: 3px; }
+
+/* ---------- List panel ---------- */
+section.lists-body { padding: 24px 0 72px; }
+.lists-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px; }
+.lists-panel-head { margin-bottom: 14px; }
+.lists-title { font-size: clamp(1.25rem, 1.1rem + .6vw, 1.5rem); letter-spacing: -0.5px; line-height: 1.3; }
+.lists-sub { margin-top: 4px; color: var(--muted); font-size: var(--fs-small); font-weight: 500; line-height: 1.55; max-width: 72ch; }
+.lists-empty { margin-top: 8px; }
+.lists-empty p { max-width: 46ch; margin-inline: auto; }
+.lists-empty p + p { margin-top: 10px; }
+
+/* ---------- Tables ---------- */
+/* Hairline rows, right-aligned tabular figures, a bold rank (the top three in full white) */
+.lists-table-wrap { overflow-x: auto; scrollbar-width: thin; }
+.lists-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.lists-table th, .lists-table td { padding: 12px; text-align: left; vertical-align: middle; border-bottom: 1px solid var(--border); }
+.lists-table thead th {
+  padding-block: 8px; border-bottom-color: var(--border-strong); white-space: nowrap;
+  color: var(--muted); font-size: var(--fs-label); font-weight: 500; line-height: 1.5;
+}
+.lists-table tbody th { font-weight: 500; }
+.lists-table tbody tr:last-child > * { border-bottom: 0; }
+.lists-table tbody tr { transition: background .2s; }
+.lists-table tbody tr:hover { background: var(--surface-2); }
+
+.lists-table .lt-rank { width: 4rem; text-align: center; }
+.lists-table td.lt-rank { font-size: 1.25rem; font-weight: 700; line-height: 1; letter-spacing: -0.5px; color: var(--muted); }
+.lists-table .is-podium td.lt-rank { color: var(--text); }
+.lists-table .lt-num { width: 11rem; text-align: right; white-space: nowrap; }
+.lists-table td.lt-num { color: var(--text); font-size: var(--fs-ui); font-weight: 700; }
+.lists-table td.lt-num + td.lt-num { color: var(--text-soft); font-weight: 600; }   /* India net: the second figure */
+.lt-head-note { font-weight: 400; }
+.lt-na { color: var(--muted); font-weight: 500; }
+/* † worldwide = India gross (explained under the table): zero width, so it hangs into the padding
+   and the marked figure still lines up with the others */
+.lt-mark { display: inline-block; width: 0; margin-left: 2px; color: var(--muted); font-weight: 500; }
+
+/* Film: poster thumb, title, then year · verdict · "Day by day" */
+.lt-film-in { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.lt-film .poster { flex: 0 0 auto; width: 40px; padding: 0; border-radius: var(--radius-sm); box-shadow: none; }
+.lt-film-text { display: grid; gap: 4px; min-width: 0; }
+.lt-title { font-size: var(--fs-body); font-weight: 600; line-height: 1.35; letter-spacing: -0.2px; color: var(--text); overflow-wrap: anywhere; }
+.lt-title:hover { text-decoration: underline; text-decoration-thickness: 1px; }
+.lt-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; color: var(--muted); font-size: var(--fs-label); font-weight: 500; line-height: 1.5; }
+.lt-sub .verdict { max-width: 100%; white-space: normal; border-radius: var(--radius); }   /* "Trending: All-Time Blockbuster*" wraps on narrow phones */
+.lt-chip {
+  display: inline-flex; align-items: center; padding: 1px 9px; border-radius: 999px;
+  background: var(--ghost); color: var(--text-soft); font-weight: 600; line-height: 1.5; white-space: nowrap;
+  transition: background .2s, color .2s;
+}
+.lt-chip:hover { background: var(--ghost-hover); color: var(--text); }
+
+/* Opening days: "Incl. paid previews" marker, with Day 1 on its own underneath */
+.lists-table .lt-note { width: 13rem; color: var(--muted); font-size: var(--fs-label); font-weight: 500; }
+.lt-prev {
+  display: inline-flex; padding: 1px 9px; border-radius: 999px; white-space: nowrap;
+  background: rgba(var(--gold-rgb), .16); color: var(--gold-ink); font-weight: 600; line-height: 1.5;
+}
+.lt-note small { display: block; margin-top: 4px; font-size: var(--fs-label); white-space: nowrap; }
+/* Noir's "gold" is red: red text on a red tint is too faint */
+[data-theme="noir"] .lt-prev { color: var(--text); }
+
+/* Notes under the table */
+.lists-notes { display: grid; gap: 2px; margin-top: 12px; padding-top: 14px; border-top: 1px solid var(--border); }
+.lists-notes .fine-print { font-size: var(--fs-label); font-weight: 500; }
+.lists-notes a { color: var(--text-soft); text-decoration: underline; }
+.lists-notes a:hover { color: var(--text); }
+
+/* ---------- Footer ---------- */
+/* A single row under the charcoal band (the film page's compact footer) */
+.lists-footer { margin-top: 0; padding-top: 0; border-top: 0; align-items: center; }
+.lists-footer-back { display: inline-flex; align-items: center; gap: 6px; color: var(--text-soft); white-space: nowrap; text-decoration: none !important; }
+.lists-footer-back:hover { color: var(--text); }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 760px) {
+  .lists-head { padding-top: 28px; }
+  .lists-head h1 { letter-spacing: -0.5px; }
+  .lists-intro { font-size: var(--fs-small); }
+  .lang-tabs { margin-top: 20px; }
+  /* The row runs to the screen edges, so a tab cut off at the right shows it scrolls */
+  .lang-tab-row { margin-inline: -16px; padding-inline: 2px; }
+  .lists-bar { margin-top: 18px; justify-items: stretch; }
+  .list-seg { display: flex; }
+  .seg-link { flex: 1 1 0; min-width: 0; padding-inline: 10px; }
+  section.lists-body { padding: 16px 0 48px; }
+  .lists-panel { padding: 18px 14px; }
+
+  /* Each row becomes a compact card: rank, thumb and title on top, the figures underneath.
+     The table keeps its roles (set in js/lists.js), so screen readers still read it as a table. */
+  .lists-table-wrap { overflow: visible; }
+  .lists-table, .lists-table tbody { display: block; }
+  .lists-table thead {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  .lists-table tbody tr {
+    display: grid; grid-template-columns: 1.75rem repeat(2, minmax(0, 1fr)); gap: 10px 12px;
+    padding: 14px 0; border-top: 1px solid var(--border);
+  }
+  .lists-table tbody tr:first-child { border-top: 0; padding-top: 4px; }
+  .lists-table tbody tr:last-child { padding-bottom: 0; }
+  .lists-table tbody tr:hover { background: none; }
+  .lists-table tbody th, .lists-table tbody td { display: block; width: auto; padding: 0; border: 0; text-align: left; }
+  .lists-table tbody td.lt-rank { grid-row: 1; align-self: center; width: auto; font-size: 1.125rem; text-align: left; }
+  .lists-table .lt-film { grid-column: 2 / -1; min-width: 0; }
+  .lists-table tbody td.lt-num { grid-row: 2; display: grid; align-content: start; gap: 2px; min-width: 0; width: auto; text-align: left; }
+  .lists-table tbody td.lt-note { width: auto; }
+  .lists-table td.lt-num:nth-child(3) { grid-column: 2; }
+  .lists-table td.lt-num:nth-child(4) { grid-column: 3; }
+  .lists-table td[data-label]::before {
+    content: attr(data-label); color: var(--muted); font-size: var(--fs-label); font-weight: 500; line-height: 1.5;
+  }
+  .lists-table td.lt-note { grid-row: 2; grid-column: 3; align-self: center; }
+  .lists-table td.lt-note:empty { display: none; }
+  .lt-prev { max-width: 100%; white-space: normal; border-radius: var(--radius); }   /* wraps on 320px phones */
+  .lt-note small { white-space: normal; }
+}
+@media (max-width: 560px) {
+  /* "Top grossers | Opening days": both halves of the switch fit side by side */
+  .seg-lead { display: none; }
+}
+@media (max-width: 420px) {
+  .lists-panel { padding: 16px 12px; }
+  .lists-table tbody tr { column-gap: 10px; }
+  .lt-film-in { gap: 12px; }
+}

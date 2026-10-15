@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0F0F13">
+  <meta name="robots" content="noindex">
+  <script>try{document.documentElement.dataset.theme=localStorage.getItem("manaLook")||"district"}catch(e){document.documentElement.dataset.theme="district"}</script>
+  <title>Admin | MANA CINEMA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=3">
+  <link rel="stylesheet" href="css/admin.css?v=3">
+</head>
+<body class="admin-page">
+
+  <!-- Sign in -->
+  <div class="admin-login" id="login">
+    <form class="login-card" id="loginForm">
+      <a href="index.html" class="logo"><span class="logo-mark"><i data-lucide="clapperboard"></i></span>MANA&nbsp;<span>CINEMA</span></a>
+      <h1>Admin portal</h1>
+      <p class="muted">Sign in to manage films, collections and ratings.</p>
+      <div class="field">
+        <label for="adminPass">Password</label>
+        <input id="adminPass" type="password" autocomplete="current-password" required aria-describedby="loginError">
+      </div>
+      <p class="login-error" id="loginError" role="alert"></p>
+      <button class="btn btn-primary btn-block" type="submit"><i data-lucide="log-in"></i> Sign in</button>
+      <a href="index.html" class="admin-back"><i data-lucide="arrow-left"></i> Back to website</a>
+    </form>
+  </div>
+
+  <!-- Portal -->
+  <div class="admin-app" id="app" hidden>
+    <aside class="admin-side">
+      <a href="index.html" class="logo"><span class="logo-mark"><i data-lucide="clapperboard"></i></span>MANA&nbsp;<span>CINEMA</span></a>
+      <nav class="admin-nav" aria-label="Admin">
+        <button type="button" data-view="dashboard"><i data-lucide="layout-dashboard"></i> Dashboard</button>
+        <button type="button" data-view="films"><i data-lucide="film"></i> Films</button>
+        <button type="button" data-view="collections"><i data-lucide="bar-chart-3"></i> Collections</button>
+        <button type="button" data-view="ratings"><i data-lucide="star"></i> Ratings</button>
+        <button type="button" data-view="messages"><i data-lucide="inbox"></i> Messages <span class="nav-badge" id="msgBadge" hidden></span></button>
+        <button type="button" data-view="settings"><i data-lucide="settings"></i> Settings</button>
+      </nav>
+      <div class="admin-side-foot">
+        <a href="index.html" target="_blank" rel="noopener" class="btn btn-ghost btn-sm btn-block"><i data-lucide="external-link"></i> View website</a>
+        <button type="button" class="link-btn" id="logoutBtn"><i data-lucide="log-out"></i> Sign out</button>
+      </div>
+    </aside>
+
+    <main class="admin-main" id="main">
+      <header class="admin-top nav-inner">
+        <h1 id="viewTitle" tabindex="-1">Dashboard</h1>
+        <a href="index.html" target="_blank" rel="noopener" class="icon-btn mobile-only" aria-label="View website" title="View website"><i data-lucide="external-link"></i></a>
+        <button type="button" class="icon-btn mobile-only" id="logoutTop" aria-label="Sign out" title="Sign out"><i data-lucide="log-out"></i></button>
+      </header>
+
+      <!-- Dashboard -->
+      <section class="admin-view" id="view-dashboard" aria-labelledby="viewTitle">
+        <div class="stat-grid" id="statGrid"></div>
+        <div class="admin-cols">
+          <div class="panel">
+            <div class="panel-title"><h2><i data-lucide="globe"></i>Top 10 worldwide</h2><small>All languages · trade estimates</small></div>
+            <div class="bar-list" id="grossBars"></div>
+            <div class="panel-foot"><a href="index.html#box-office" target="_blank" rel="noopener" class="link-btn">See all on the site <i data-lucide="external-link"></i></a></div>
+          </div>
+          <div>
+            <div class="panel">
+              <div class="panel-title"><h2><i data-lucide="list-checks"></i>Needs attention</h2><small id="attentionCount"></small></div>
+              <ul class="attention-list" id="attentionList"></ul>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><h2><i data-lucide="languages"></i>Films by language</h2><small>Pick one to see its films</small></div>
+              <div class="lang-tiles" id="langTiles"></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel dash-reviews">
+          <div class="panel-title"><h2><i data-lucide="message-square"></i>Latest audience reviews</h2><button type="button" class="link-btn" data-goto="ratings">See all</button></div>
+          <ul class="review-feed" id="latestReviews"></ul>
+        </div>
+      </section>
+
+      <!-- Films -->
+      <section class="admin-view" id="view-films" aria-labelledby="viewTitle" hidden>
+        <div class="admin-toolbar">
+          <p class="muted" id="filmCount"></p>
+          <button type="button" class="btn btn-primary btn-sm" id="addFilm"><i data-lucide="plus"></i> Add film</button>
+        </div>
+        <div class="film-filters">
+          <label class="search"><span class="sr-only">Search films</span><i data-lucide="search" class="search-icon"></i>
+            <input type="search" id="filmSearch" placeholder="Title, director or cast" autocomplete="off"></label>
+          <div class="chips filter-chips" id="filmLangs" role="group" aria-label="Filter by language"></div>
+        </div>
+        <p class="film-results" id="filmResults" role="status"></p>
+        <div class="admin-film-list" id="filmList"></div>
+        <div class="list-more" id="filmMore"></div>
+      </section>
+
+      <!-- Collections -->
+      <section class="admin-view" id="view-collections" aria-labelledby="viewTitle" hidden>
+        <div class="admin-toolbar editor-bar">
+          <div class="picker-group">
+            <div class="field find">
+              <div class="label-row"><label for="coFind">Find a film</label><small class="find-count" id="coFindCount" aria-live="polite"></small></div>
+              <input type="search" id="coFind" placeholder="Title or cast" autocomplete="off" aria-describedby="coFindHint">
+              <span class="sr-only" id="coFindHint">Narrows the film menu. Enter opens the first match.</span>
+            </div>
+            <div class="field picker">
+              <label for="coFilm">Film</label>
+              <select id="coFilm"></select>
+            </div>
+          </div>
+          <div class="editor-bar-actions">
+            <span class="save-state" id="coState" role="status"></span>
+            <button type="button" class="btn btn-ghost btn-sm" id="coExport"><i data-lucide="download"></i> Export CSV</button>
+            <button type="button" class="btn btn-primary btn-sm" id="coSaveTop"><i data-lucide="save"></i> Save</button>
+          </div>
+        </div>
+        <p class="film-context" id="coContext"></p>
+
+        <div class="co-layout" id="coLayout">
+          <form class="co-editor" id="coForm" novalidate>
+            <!-- a. Day-wise -->
+            <div class="panel">
+              <div class="panel-title">
+                <h2><i data-lucide="calendar-days"></i>Day-wise India net</h2>
+                <small>₹ crore · after GST · <span class="wkend-key">Fri–Sun</span> dates highlighted</small>
+              </div>
+              <div class="table-wrap day-wrap" id="dayTable"></div>
+              <div class="row-actions">
+                <button type="button" class="btn btn-ghost btn-sm" id="addDay"><i data-lucide="plus"></i> Add next day</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="addPreviews"><i data-lucide="sparkles"></i> Add paid previews (Day 0)</button>
+              </div>
+              <details class="paste" id="pasteBox">
+                <summary><i data-lucide="clipboard-paste"></i> Paste figures</summary>
+                <div class="paste-body">
+                  <label for="pasteText">One day per line, for example <code>1, 63.75</code>, <code>Day 2 18.45</code>, <code>Previews 21</code>, or rows copied from a spreadsheet.</label>
+                  <textarea id="pasteText" rows="6" spellcheck="false" placeholder="Previews 21&#10;Day 1 63.75&#10;Day 2 18.45&#10;3	18.5"></textarea>
+                  <div class="paste-result" id="pasteResult" aria-live="polite"></div>
+                  <div class="row-actions">
+                    <button type="button" class="btn btn-ghost btn-sm" id="pasteReplace" disabled><i data-lucide="replace"></i> Replace all days</button>
+                    <button type="button" class="btn btn-ghost btn-sm" id="pasteMerge" disabled><i data-lucide="merge"></i> Merge</button>
+                  </div>
+                </div>
+              </details>
+            </div>
+
+            <!-- b. Reported opening day (films without day-wise figures) -->
+            <div class="panel">
+              <div class="panel-title"><h2><i data-lucide="zap"></i>Reported opening day</h2><small>India net, ₹ Cr</small></div>
+              <p class="muted panel-copy">Used when a film has no day-wise figures, for example older films in the language lists. Once Day 1 is in the table above, the opening day comes from the table instead.</p>
+              <div class="form-grid">
+                <div class="field"><label for="oNet">Opening day (₹ Cr)</label><input id="oNet" type="number" min="0" step="0.01" inputmode="decimal" data-path="opening.net" data-type="num"></div>
+                <div class="field"><label for="oPreviews">Paid previews (₹ Cr)</label><input id="oPreviews" type="number" min="0" step="0.01" inputmode="decimal" data-path="opening.previews" data-type="num" aria-describedby="oPreviewsHint"><small class="field-hint" id="oPreviewsHint">Blank if there were none or they weren't reported</small></div>
+                <div class="field"><label for="oIncludes">Includes paid previews?</label>
+                  <select id="oIncludes" data-path="opening.includesPreviews" data-type="tri" aria-describedby="oIncludesHint">
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
+                    <option value="">Not known</option>
+                  </select>
+                  <small class="field-hint" id="oIncludesHint">Does the opening figure already count the previews?</small>
+                </div>
+              </div>
+              <p class="opening-use" id="openingUse" aria-live="polite"></p>
+            </div>
+
+            <!-- c. Totals -->
+            <div class="panel">
+              <div class="panel-title"><h2><i data-lucide="sigma"></i>Totals</h2><small>Leave blank if not reported</small></div>
+              <div class="form-grid">
+                <div class="field"><label for="tIndiaNet">Lifetime India net (₹ Cr)</label><input id="tIndiaNet" type="number" min="0" step="0.01" inputmode="decimal" data-path="totals.indiaNet" data-type="num"></div>
+                <div class="field"><label for="tIndiaGross">India gross (₹ Cr)</label><input id="tIndiaGross" type="number" min="0" step="0.01" inputmode="decimal" data-path="totals.indiaGross" data-type="num"></div>
+                <div class="field"><label for="tOverseas">Overseas gross (₹ Cr)</label><input id="tOverseas" type="number" min="0" step="0.01" inputmode="decimal" data-path="totals.overseasGross" data-type="num"></div>
+                <div class="field"><label for="tWorldwide">Worldwide gross (₹ Cr)</label><input id="tWorldwide" type="number" min="0" step="0.01" inputmode="decimal" data-path="totals.worldwideGross" data-type="num" aria-describedby="tWorldwideHint"><small class="field-hint" id="tWorldwideHint">Blank = India gross + overseas</small></div>
+                <div class="field"><label for="tClaim">Makers' claim, worldwide (₹ Cr)</label><input id="tClaim" type="number" min="0" step="0.01" inputmode="decimal" data-path="totals.producerClaim" data-type="num" aria-describedby="tClaimHint"><small class="field-hint" id="tClaimHint">Shown for context, never ranked</small></div>
+              </div>
+            </div>
+
+            <!-- d. Budget, verdict, status -->
+            <div class="panel">
+              <div class="panel-title"><h2><i data-lucide="scale"></i>Budget, verdict and status</h2></div>
+              <div class="form-grid">
+                <div class="field"><label for="bLow">Budget low (₹ Cr)</label><input id="bLow" type="number" min="0" step="1" inputmode="decimal" data-path="budget.low" data-type="num"></div>
+                <div class="field"><label for="bHigh">Budget high (₹ Cr)</label><input id="bHigh" type="number" min="0" step="1" inputmode="decimal" data-path="budget.high" data-type="num"></div>
+                <div class="field"><label for="vLabel">Verdict</label><select id="vLabel" data-path="verdict" data-type="text"></select></div>
+                <div class="field"><label for="vSource">Verdict source</label><input id="vSource" maxlength="160" placeholder="Sacnilk" data-path="verdictSource" data-type="text"></div>
+                <div class="field">
+                  <div class="label-row">
+                    <label for="asOf">Figures as of</label>
+                    <button type="button" class="link-btn" id="asOfToday">Today<span class="sr-only"> as the figures date</span></button>
+                  </div>
+                  <input id="asOf" type="date" data-path="asOf" data-type="text">
+                </div>
+                <div class="field"><label for="previewsDate">Paid previews date</label><input id="previewsDate" type="date" data-path="previewsDate" data-type="text" aria-describedby="previewsHint"><small class="field-hint" id="previewsHint">Optional. Blank = the day before release</small></div>
+              </div>
+              <label class="check"><input type="checkbox" id="running" data-path="running" data-type="bool"> Still in theatres (figures and verdict may change)</label>
+            </div>
+
+            <!-- e. Day 1 by language -->
+            <div class="panel">
+              <div class="panel-title"><h2><i data-lucide="languages"></i>Day 1 by language</h2><small>India net, ₹ Cr · the film's release languages</small></div>
+              <div class="form-grid lang-grid" id="splitFields"></div>
+            </div>
+
+            <!-- f. Sources and notes -->
+            <div class="panel">
+              <div class="panel-title"><h2><i data-lucide="link"></i>Sources</h2><small>Links must start with http:// or https://</small></div>
+              <div id="sourceRows" class="source-rows"></div>
+              <div class="row-actions"><button type="button" class="btn btn-ghost btn-sm" id="addSource"><i data-lucide="plus"></i> Add source</button></div>
+              <div class="field notes-field">
+                <label for="coNotes">Notes</label>
+                <textarea id="coNotes" rows="4" aria-describedby="coNotesHint"></textarea>
+                <small class="field-hint" id="coNotesHint">One note per line. Shown on the film page under the figures.</small>
+              </div>
+            </div>
+          </form>
+
+          <aside class="co-summary panel" id="coSummary" aria-label="Live summary"></aside>
+        </div>
+      </section>
+
+      <!-- Ratings -->
+      <section class="admin-view" id="view-ratings" aria-labelledby="viewTitle" hidden>
+        <form class="panel critics-panel" id="rtForm" novalidate>
+          <div class="panel-title"><h2><i data-lucide="award"></i>Critics and IMDb</h2><span class="save-state" id="rtState" role="status"></span></div>
+          <div class="critics-head">
+            <div class="picker-group">
+              <div class="field find">
+                <div class="label-row"><label for="rtFind">Find a film</label><small class="find-count" id="rtFindCount" aria-live="polite"></small></div>
+                <input type="search" id="rtFind" placeholder="Title or cast" autocomplete="off" aria-describedby="rtFindHint">
+                <span class="sr-only" id="rtFindHint">Narrows the film menu. Enter opens the first match.</span>
+              </div>
+              <div class="field picker"><label for="rtFilm">Film</label><select id="rtFilm"></select></div>
+            </div>
+            <div class="critics-preview" id="rtPreview" aria-live="polite"></div>
+          </div>
+          <fieldset class="imdb-row">
+            <legend>IMDb</legend>
+            <div class="form-grid">
+              <div class="field"><label for="imdbScore">Score out of 10</label><input id="imdbScore" type="number" min="0" max="10" step="0.1" inputmode="decimal" data-imdb="score"></div>
+              <div class="field"><label for="imdbVotes">Votes</label><input id="imdbVotes" maxlength="20" placeholder="12,253" data-imdb="votes"></div>
+              <div class="field">
+                <div class="label-row">
+                  <label for="imdbAsOf">As of</label>
+                  <button type="button" class="link-btn" id="imdbToday">Today<span class="sr-only"> as the IMDb date</span></button>
+                </div>
+                <input id="imdbAsOf" type="date" data-imdb="asOf">
+              </div>
+            </div>
+          </fieldset>
+          <h3 class="sub-head">Critics</h3>
+          <div class="table-wrap" id="criticRows"></div>
+          <div class="row-actions">
+            <button type="button" class="btn btn-ghost btn-sm" id="addCritic"><i data-lucide="plus"></i> Add critic</button>
+            <span class="spacer"></span>
+            <button type="button" class="btn btn-ghost btn-sm" id="rtDiscard" hidden>Discard changes</button>
+            <button type="submit" class="btn btn-primary btn-sm" id="rtSave"><i data-lucide="save"></i> Save ratings</button>
+          </div>
+          <ul class="check-list" id="rtChecks" aria-live="polite"></ul>
+        </form>
+        <div class="panel admin-empty" id="rtEmpty" hidden><i data-lucide="award"></i><p>No films yet. Add one in Films to enter its critics scores.</p></div>
+
+        <div class="panel">
+          <div class="panel-title"><h2><i data-lucide="users"></i>Audience reviews</h2><small id="reviewCount"></small></div>
+          <div class="admin-toolbar filter-bar">
+            <div class="field picker"><label for="rvFilm">Film</label><select id="rvFilm"></select></div>
+            <label class="search"><span class="sr-only">Search reviews</span><i data-lucide="search" class="search-icon"></i>
+              <input type="search" id="rvSearch" placeholder="Search name or review"></label>
+          </div>
+          <div class="table-wrap" id="reviewTable"></div>
+        </div>
+      </section>
+
+      <!-- Messages -->
+      <section class="admin-view" id="view-messages" aria-labelledby="viewTitle" hidden>
+        <div class="admin-toolbar">
+          <p class="muted" id="msgCount"></p>
+          <button type="button" class="btn btn-ghost btn-sm" id="markAllRead"><i data-lucide="check-check"></i> Mark all read</button>
+        </div>
+        <div id="messageList" class="message-list"></div>
+      </section>
+
+      <!-- Settings -->
+      <section class="admin-view" id="view-settings" aria-labelledby="viewTitle" hidden>
+        <div class="admin-cols">
+          <div>
+            <div class="panel">
+              <div class="panel-title"><h2><i data-lucide="hard-drive-download"></i>Backup and restore</h2></div>
+              <p class="muted panel-copy">Everything lives in this browser. Download a backup to keep a copy or to move your films, audience reviews and messages to another browser.</p>
+              <div class="settings-actions">
+                <button type="button" class="btn btn-ghost btn-sm" id="backupBtn"><i data-lucide="download"></i> Download backup (JSON)</button>
+                <label class="btn btn-ghost btn-sm file-btn"><i data-lucide="upload"></i> Restore from backup
+                  <input type="file" id="restoreFile" accept=".json,application/json" class="sr-only"></label>
+              </div>
+              <p class="restore-msg" id="restoreMsg" role="alert"></p>
+            </div>
+            <div class="panel">
+              <div class="panel-title"><h2><i data-lucide="rotate-ccw"></i>Reset data</h2></div>
+              <p class="muted panel-copy">Go back to the original setup. These can't be undone, so download a backup first.</p>
+              <div class="settings-actions">
+                <button type="button" class="btn btn-ghost btn-sm" data-reset="films"><i data-lucide="film"></i> Restore original films and collections</button>
+                <button type="button" class="btn btn-ghost btn-sm danger" data-reset="reviews"><i data-lucide="trash-2"></i> Delete all audience reviews</button>
+                <button type="button" class="btn btn-ghost btn-sm danger" data-reset="messages"><i data-lucide="trash-2"></i> Delete all messages</button>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <div class="panel-title"><h2><i data-lucide="info"></i>About this portal</h2></div>
+            <ul class="about-list">
+              <li>This is a front-end demo. Films, collections and ratings are saved in this browser's storage, not on a server.</li>
+              <li>The sign-in only keeps casual visitors out. It isn't real security: anyone can read the password in the page's code.</li>
+              <li>Audience ratings exist only in the browser where they were posted, so other visitors and devices don't see them.</li>
+              <li>To share data between browsers, use backup and restore, or connect a real backend and database.</li>
+              <li>Collections are trade estimates (mostly Sacnilk, India net). Keep each film's sources and as-of date up to date.</li>
+              <li>Films in the language lists often have totals only: no day-wise figures, story line or critics. Needs attention doesn't flag those gaps; it only asks for day-wise figures on releases from the last 60 days.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Add / edit film -->
+  <dialog class="admin-dialog" id="filmDialog" aria-labelledby="filmDialogTitle">
+    <form method="dialog" id="filmForm">
+      <div class="dialog-head">
+        <h2 id="filmDialogTitle">Add film</h2>
+        <button type="button" class="icon-btn" id="closeDialog" aria-label="Close"><i data-lucide="x"></i></button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-row">
+          <div class="field"><label for="fTitle">Title *</label><input id="fTitle" required maxlength="80"></div>
+          <div class="field"><label for="fGenre">Genre</label><input id="fGenre" maxlength="60" placeholder="Action / Drama"></div>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="fLangSel">Original language *</label>
+            <select id="fLangSel" required></select>
+            <input id="fLang" class="lang-other" maxlength="30" placeholder="Language name" aria-label="Original language, other" hidden disabled>
+          </div>
+          <div class="field"><label for="fLanguages">Languages released</label><input id="fLanguages" maxlength="120" placeholder="Telugu, Hindi, Tamil" aria-describedby="fLanguagesHint"><small class="field-hint" id="fLanguagesHint">Separate with commas</small></div>
+        </div>
+        <div class="form-row three">
+          <div class="field"><label for="fRelease">Release date</label><input id="fRelease" type="date" aria-describedby="fReleaseHint"><small class="field-hint" id="fReleaseHint">Empty = no exact date</small></div>
+          <div class="field" data-no-date><label for="fReleaseNote">Release note</label><input id="fReleaseNote" maxlength="60" placeholder="Sankranti 2027"></div>
+          <div class="field" data-no-date><label for="fYear">Year</label><input id="fYear" type="number" min="1900" max="2100" step="1"></div>
+        </div>
+        <label class="check" data-no-date><input type="checkbox" id="fReleased"> Already released, exact date not known</label>
+        <div class="form-row three">
+          <div class="field"><label for="fDuration">Runtime</label><input id="fDuration" maxlength="12" placeholder="2h 30m"></div>
+          <div class="field"><label for="fCert">Certificate</label><select id="fCert"></select></div>
+          <div class="field"><label for="fArt">Hero artwork</label><select id="fArt"></select></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label for="fDirector">Director</label><input id="fDirector" maxlength="80"></div>
+          <div class="field"><label for="fCast">Starring</label><input id="fCast" maxlength="160" placeholder="Hero, Heroine, Villain"></div>
+        </div>
+        <div class="field"><label for="fDesc">Story line</label><textarea id="fDesc" rows="3" maxlength="400" aria-describedby="fDescHint"></textarea><small class="field-hint" id="fDescHint">Optional. Films in the language lists usually have none.</small></div>
+        <div class="form-row three">
+          <div class="field"><label for="fColor1">Poster colour 1</label><input id="fColor1" type="color" value="#d63bff"></div>
+          <div class="field"><label for="fColor2">Poster colour 2</label><input id="fColor2" type="color" value="#0c0716"></div>
+          <div class="field"><label for="fImage">Photo file (optional)</label><input id="fImage" maxlength="200" placeholder="images/posters/name.jpg" aria-describedby="fImageHint"><small class="field-hint" id="fImageHint">images/posters/name.jpg or an https link</small></div>
+        </div>
+        <label class="check"><input type="checkbox" id="fCover"> Show on the full-screen cover page (only one film can be the cover)</label>
+      </div>
+      <div class="dialog-foot">
+        <div class="dialog-preview" id="filmPreview" aria-hidden="true"></div>
+        <button type="button" class="btn btn-ghost" id="cancelDialog">Cancel</button>
+        <button type="submit" class="btn btn-primary" value="save"><i data-lucide="save"></i> Save film</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="js/films-india.js?v=3"></script>
+  <script src="js/data.js?v=3"></script>
+  <script src="js/art.js?v=3"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" integrity="sha384-ieG+IKD0d/ZPXyCBTMVAbqsQdns8QGJR/e26WMw7M4fkaI/rHcS/YIoi+ah9WGge" crossorigin="anonymous"></script>
+  <script src="js/ui.js?v=3"></script>
+  <script src="js/boxoffice.js?v=3"></script>
+  <script src="js/admin.js?v=3"></script>
+</body>
+</html>

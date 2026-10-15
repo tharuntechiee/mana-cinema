@@ -1,0 +1,422 @@
+/* =========================================================
+   Film page (film.html): box office & ratings for one film
+   Builds on css/style.css tokens and components.
+   District-style anatomy: a black movie hero with the poster as a blurred backdrop,
+   flat hairline cards, sentence-case headings and pill tabs.
+   ========================================================= */
+
+/* Language colours for "Day 1 by language" (js/film.js). Every theme keeps them apart. */
+.film-page {
+  --lang-1: var(--accent);   /* Telugu */
+  --lang-2: var(--gold);     /* Hindi */
+  --lang-3: var(--success);  /* Tamil */
+  --lang-4: var(--danger);   /* Malayalam */
+  --lang-5: var(--muted);    /* Kannada and anything else */
+}
+[data-theme="midnight"] .film-page, [data-theme="light"] .film-page, [data-theme="popcorn"] .film-page,
+[data-theme="sunset"] .film-page { --lang-4: var(--text-soft); }        /* red accent ~ red danger */
+[data-theme="emerald"] .film-page, [data-theme="aurora"] .film-page { --lang-3: var(--text-soft); }  /* green accent ~ green success */
+[data-theme="noir"] .film-page { --lang-4: var(--warn); }                /* red gold ~ red danger */
+
+/* ---------- Header: movie hero ---------- */
+/* Black band; the poster sits on the right as a dark, blurred backdrop that fades into the black */
+.film-header { position: relative; overflow: hidden; isolation: isolate; background: var(--bg); padding: 28px 0 0; }
+.film-backdrop {
+  position: absolute; top: 0; right: 0; bottom: 0; width: min(68%, 980px); z-index: -2;
+  filter: blur(24px) brightness(.7) saturate(1.15); transform: scale(1.12); transform-origin: right center;
+}
+.film-header::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    linear-gradient(90deg, var(--bg) 32%, rgba(var(--bg-rgb), .8) 50%, rgba(var(--bg-rgb), .25) 78%, rgba(var(--bg-rgb), .45) 100%),
+    linear-gradient(0deg, var(--bg) 0%, transparent 28%);
+}
+[data-theme="noir"] .film-backdrop { filter: blur(24px) brightness(.7) grayscale(1); }
+/* Light themes: a soft wash of the poster instead of a dark one */
+[data-theme="light"] .film-backdrop, [data-theme="popcorn"] .film-backdrop { filter: blur(30px) saturate(1.2); opacity: .45; }
+
+.film-back {
+  display: inline-flex; align-items: center; gap: 6px; margin-bottom: 28px;
+  color: var(--muted); font-weight: 600; font-size: var(--fs-small);
+}
+.film-back:hover { color: var(--text); }
+
+.film-head { display: grid; grid-template-columns: minmax(0, 1fr) clamp(220px, 22vw, 280px); gap: 32px 56px; align-items: center; }
+.film-head-info { min-width: 0; max-width: 680px; }
+.film-head h1 { font-size: var(--fs-hero); line-height: 1.2; letter-spacing: -1px; margin: 0 0 10px; overflow-wrap: anywhere; }
+
+/* "U/A | Telugu +4 | 3h 20m" */
+.film-meta { display: flex; flex-wrap: wrap; align-items: center; color: var(--text-soft); font-size: var(--fs-small); font-weight: 500; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.film-meta .sep { margin: 0 10px; color: var(--muted); }
+.film-desc { margin-top: 16px; color: var(--text-soft); font-size: var(--fs-body); line-height: 1.65; max-width: 62ch; }
+.film-genres { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin-top: 18px; }
+
+.film-when { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 18px; color: var(--muted); font-size: var(--fs-label); font-weight: 500; font-variant-numeric: tabular-nums; }
+.countdown {
+  display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 999px;
+  background: rgba(var(--gold-rgb), .16); color: var(--gold-ink); font-weight: 600;
+}
+/* Noir's "gold" is red: red text on a red tint is too faint, so these pills keep white text */
+[data-theme="noir"] .countdown, [data-theme="noir"] .you-badge,
+[data-theme="noir"] .film-ctas .remind-btn[aria-pressed="true"] { color: var(--text); }
+.film-verdict { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 12px; }
+.film-verdict small { color: var(--muted); font-size: var(--fs-label); font-weight: 500; }
+
+/* Rank chips: "#3 Hindi film of all time · worldwide gross", each a link to that list on the Lists page */
+.film-ranks { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin-top: 14px; }
+.rank-chip {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 6px 13px 6px 10px; border-radius: 999px;
+  background: var(--ghost); color: var(--text-soft); font-size: .8125rem; font-weight: 500; line-height: 1.4;
+  transition: background .2s, color .2s;
+}
+.rank-chip:hover { background: var(--ghost-hover); color: var(--text); }
+.film-ranks li { min-width: 0; max-width: 100%; }
+.rank-chip svg.lucide { flex: 0 0 auto; width: 15px; height: 15px; color: var(--gold); }
+.rank-chip strong { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+.rank-basis { color: var(--muted); }
+
+.film-ctas { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+.film-ctas .btn { min-height: 48px; padding: 0 clamp(22px, 3vw, 36px); }
+.film-ctas .remind-btn svg.lucide { width: 18px; height: 18px; }
+
+/* Poster card on the right */
+.film-head-poster .poster {
+  width: 100%; border-radius: var(--radius-lg); border: 1px solid var(--border);
+  box-shadow: 0 24px 48px -20px rgba(0, 0, 0, .55);
+}
+/* Films without artwork or a photo: the title sits on the film's own gradient (js/film.js filmPoster) */
+.poster-text { gap: 6px; }
+.poster-text .poster-title { overflow-wrap: anywhere; }
+.poster-text .poster-lang { margin-top: 0; }
+.film-head-poster .poster-text { padding: 20px; }
+.film-head-poster .poster-text .poster-title { font-size: var(--fs-h2); letter-spacing: -0.5px; }
+.more-card .poster-text .poster-title { font-size: var(--fs-h4); }
+
+/* Pill tabs that jump to each section */
+.film-tabs { margin-top: 40px; border-bottom: 1px solid var(--border); }
+/* The negative margin lines the first label up with the title instead of the pill's edge */
+.film-tabs ul { display: flex; gap: 4px; list-style: none; padding: 10px 0; margin-inline: -14px; overflow-x: auto; scrollbar-width: none; }
+.film-tabs ul::-webkit-scrollbar { display: none; }
+.film-tabs a {
+  display: block; padding: 8px 14px; border-radius: 999px; white-space: nowrap;
+  color: var(--text-soft); font-size: var(--fs-small); font-weight: 600; line-height: 1.45;
+  transition: color .2s, background .2s;
+}
+.film-tabs a:hover { color: var(--text); background: var(--ghost); }
+.film-tabs a:focus-visible { outline-offset: -2px; }
+
+/* ---------- Sections ---------- */
+.film-page main { padding-bottom: 24px; }
+section.film-section { padding: 0; margin-top: 56px; }
+.film-section-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px 20px; margin-bottom: 20px; }
+.film-section-head h2 { font-size: clamp(1.25rem, 1.1rem + .6vw, 1.5rem); letter-spacing: -0.5px; line-height: 1.3; }
+.film-section .empty-state p { max-width: 46ch; margin-inline: auto; }
+.text-link { color: var(--text); font-weight: 600; text-decoration: underline; text-decoration-color: var(--gold); }
+.text-link:hover { color: var(--gold-ink); }
+
+/* ---------- Cast & crew ---------- */
+/* Round avatars with initials, names underneath */
+.cast-row { display: flex; flex-wrap: wrap; gap: 20px 24px; list-style: none; }
+.cast-person { display: flex; flex-direction: column; align-items: center; width: 96px; text-align: center; }
+.cast-avatar {
+  display: grid; place-items: center; width: 88px; height: 88px; border-radius: 50%; margin-bottom: 10px;
+  background: var(--surface-3); border: 1px solid var(--border); color: var(--text);
+  font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1;
+}
+.cast-name { max-width: 100%; color: var(--text); font-size: .8125rem; font-weight: 500; line-height: 1.35; overflow-wrap: break-word; }
+.cast-role { margin-top: 2px; color: var(--muted); font-size: var(--fs-label); font-weight: 500; line-height: 1.35; }
+
+/* ---------- Key numbers ---------- */
+.stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.stat-tile { min-width: 0; padding: 16px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.stat-tile-key { border-color: rgba(var(--gold-rgb), .4); }
+.stat-label { color: var(--muted); font-size: var(--fs-label); font-weight: 500; line-height: 1.4; }
+.stat-value { margin: 6px 0 4px; font-size: 1.5rem; font-weight: 700; line-height: 1.25; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.stat-sub { color: var(--muted); font-size: var(--fs-label); font-weight: 500; line-height: 1.5; }
+.stat-sub-line { display: block; margin-top: 2px; color: var(--text-soft); }
+.stat-tile-verdict .verdict { font-size: var(--fs-small); padding: 4px 12px; letter-spacing: 0; }
+.not-reported { color: var(--muted); font-size: 1rem; font-weight: 600; letter-spacing: 0; }
+/* Shorter grids (totals-only films): the verdict tile fills the rest of its row; four tiles sit in one row */
+@media (min-width: 761px) {
+  .stat-tile-verdict:nth-child(3n+1) { grid-column: 1 / -1; }
+  .stat-tile-verdict:nth-child(3n+2) { grid-column: span 2; }
+  .stat-grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .stat-grid-4 > .stat-tile-verdict { grid-column: auto; }
+}
+.numbers-fine { margin-top: 14px; }
+.numbers-fine p + p, .table-notes p + p { margin-top: 3px; }
+
+/* ---------- Totals-only films: no day-by-day figures ---------- */
+.no-days { display: flex; align-items: flex-start; gap: 16px; }
+.no-days-icon { display: grid; place-items: center; flex: 0 0 auto; width: 44px; height: 44px; border-radius: 50%; background: var(--ghost); color: var(--muted); }
+.no-days-icon svg.lucide { width: 20px; height: 20px; }
+.no-days-body { min-width: 0; }
+.no-days-body p { color: var(--text-soft); font-size: var(--fs-ui); line-height: 1.6; max-width: 62ch; }
+.no-days-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.no-days-links .btn { max-width: 100%; white-space: normal; text-align: left; }   /* long language names wrap on phones */
+.no-days-links .btn svg.lucide { flex: 0 0 auto; width: 15px; height: 15px; color: var(--gold); }
+
+/* ---------- Day-by-day chart ---------- */
+.chart-head { flex-wrap: wrap; align-items: center; }
+/* Two pill tabs; the pressed one is solid like the filter chips */
+.seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--ghost); }
+.seg-btn {
+  border: 0; background: none; color: var(--text-soft); cursor: pointer; padding: 6px 14px; border-radius: 999px;
+  font-size: var(--fs-small); font-weight: 600; line-height: 1.45; transition: color .2s, background .2s;
+}
+.seg-btn:hover { color: var(--text); }
+.seg-btn[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+
+.chart-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; list-style: none; margin: -6px 0 12px; color: var(--muted); font-size: var(--fs-label); font-weight: 500; }
+.chart-legend li { display: inline-flex; align-items: center; gap: 7px; }
+.key { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
+.key-weekday { background: var(--accent); }
+.key-weekend { background: var(--gold); box-shadow: 0 0 0 3px var(--ghost); }
+.key-previews { background: repeating-linear-gradient(45deg, var(--muted) 0 2px, transparent 2px 5px), var(--surface-3); }
+
+.chart-wrap { position: relative; touch-action: pan-y; border-radius: var(--radius-sm); }
+.chart-svg { display: block; width: 100%; height: auto; overflow: visible; font-family: var(--font-body); font-size: 12px; font-variant-numeric: tabular-nums; }
+.chart-svg text { font-size: 12px; font-weight: 500; }
+.chart-svg .chart-callout { font-size: 12px; font-weight: 700; }
+.chart-svg .bar { transition: opacity .15s; }
+.chart-svg.has-hover .bar:not(.is-hot) { opacity: .4; }
+.chart-tip {
+  position: absolute; z-index: 5; pointer-events: none; display: grid; gap: 1px; min-width: 130px;
+  padding: 8px 12px; border-radius: var(--radius-btn); background: var(--surface-3); border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow); font-size: var(--fs-label); line-height: 1.5; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.chart-tip span { color: var(--muted); }
+.chart-tip strong { color: var(--text); font-size: var(--fs-ui); }
+.chart-tip .up { color: var(--success); }
+.chart-tip .down { color: var(--danger); }
+.chart-note { margin-top: 10px; font-size: var(--fs-label); }
+
+/* ---------- Day-by-day table ---------- */
+/* A clean list: hairline rows, tabular figures; weekends get a small blue dot, not a shaded band */
+/* position: relative keeps the .sr-only caption inside the scroll box, so it can't widen the page */
+.table-wrap { position: relative; overflow-x: auto; scrollbar-width: thin; border-radius: var(--radius-sm); }
+.bo-table { width: 100%; min-width: 640px; border-collapse: separate; border-spacing: 0; font-size: var(--fs-small); font-variant-numeric: tabular-nums; }
+.bo-table th, .bo-table td { padding: 11px 14px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
+.bo-table tbody tr:last-child > * { border-bottom: 0; }
+.bo-table thead th { color: var(--muted); font-size: var(--fs-label); font-weight: 500; border-bottom-color: var(--border-strong); }
+.bo-table .num { text-align: right; }
+.bo-table td.money { color: var(--text); font-weight: 600; }
+/* The Day column stays put while the rest scrolls sideways on phones */
+.bo-table th:first-child { position: sticky; left: 0; z-index: 1; padding-left: 24px; background: var(--surface); }
+.bo-table thead th:first-child { z-index: 2; }
+.bo-table tbody th { font-weight: 600; }
+.bo-table .is-weekend > th::before {
+  content: ""; position: absolute; left: 10px; top: 50%; width: 6px; height: 6px; margin-top: -3px;
+  border-radius: 50%; background: var(--gold);
+}
+.bo-table .is-previews > th { color: var(--text-soft); }
+.bo-table .week-total > * { background: var(--surface-2); font-weight: 700; }
+.bo-table .week-total > th { background: var(--surface-2); }
+.bo-table .week-note { color: var(--muted); font-size: var(--fs-label); font-weight: 500; }
+.wk-legend { display: inline-flex; align-items: center; gap: 6px; margin-left: 14px; }
+.wk-key { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
+.table-more { margin-top: 14px; }
+.table-notes { margin-top: 14px; font-size: var(--fs-label); }
+
+/* ---------- How it held up · Milestones · Day 1 by language ---------- */
+/* Cards in a row share one height, so the row ends on a single line */
+.insight-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 20px; }
+.insight-grid > .panel { margin: 0; }
+.insight .panel-title, .table-panel .panel-title { flex-wrap: wrap; row-gap: 2px; }   /* the note drops below the title instead of squeezing */
+.insight .panel-title small, .table-panel .panel-title small, .chart-panel .panel-title small { font-size: var(--fs-label); font-weight: 500; }
+.held-list { display: grid; gap: 16px; }
+.held-item { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline; }
+.held-item dt { font-weight: 600; font-size: var(--fs-small); }
+.held-value { font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.01em; }
+.held-note { grid-column: 1 / -1; color: var(--muted); font-size: var(--fs-label); line-height: 1.5; }
+
+.milestone-list { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; }
+.milestone {
+  padding: 6px 12px; border-radius: 999px; background: var(--ghost);
+  color: var(--text-soft); font-size: var(--fs-label); font-weight: 500; font-variant-numeric: tabular-nums;
+}
+.milestone strong { color: var(--text); font-weight: 700; }
+
+.lang-bar { display: flex; gap: 2px; height: 12px; border-radius: 6px; overflow: hidden; margin: 2px 0 16px; }
+.lang-bar span { flex-basis: 0; min-width: 2px; }
+.lang-legend { display: grid; gap: 8px; list-style: none; }
+.lang-legend li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 4.2em; gap: 10px; align-items: center; font-size: var(--fs-small); }
+.lang-legend .swatch { width: 10px; height: 10px; border-radius: 3px; }
+.lang-name { font-weight: 500; }
+.lang-share { color: var(--muted); text-align: right; }
+.lang-single { color: var(--text-soft); font-size: var(--fs-small); }
+
+/* ---------- Ratings ---------- */
+/* Critics (the long list) on the left; IMDb and audience stacked on the right */
+.rating-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto 1fr; gap: 12px; align-items: start; }
+.rating-grid > :first-child { grid-row: span 2; }
+.rating-grid > .panel { margin: 0; }
+/* No critics or IMDb score: two cards side by side, same height */
+.rating-grid-even { grid-template-rows: none; align-items: stretch; }
+.rating-grid-even > :first-child { grid-row: auto; }
+.rating-kicker, .sources-kicker {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+  font-family: var(--font-body); font-size: var(--fs-small); font-weight: 600; letter-spacing: 0; line-height: 1.3; color: var(--text-soft);
+}
+.rating-kicker svg.lucide, .sources-kicker svg.lucide { width: 16px; height: 16px; color: var(--muted); }
+.rating-big { display: flex; align-items: baseline; gap: 4px; }
+.rating-big .score { font-size: 2.5rem; font-weight: 700; line-height: 1; letter-spacing: -1px; }
+.rating-big small { color: var(--muted); font-size: var(--fs-ui); font-weight: 500; }
+.rating-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 14px; color: var(--muted); font-size: var(--fs-label); font-weight: 500; }
+.rating-none { color: var(--muted); font-size: var(--fs-small); }
+.outlet-list { list-style: none; border-top: 1px solid var(--border); }
+.outlet-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: var(--fs-small); }
+.outlet-list li:last-child { border-bottom: 0; padding-bottom: 0; }
+.outlet-list a { color: var(--text-soft); text-decoration: underline; text-decoration-color: var(--border-strong); min-width: 0; }
+.outlet-list a:hover { color: var(--text); text-decoration-color: currentColor; }
+.outlet-list a svg.lucide, .source-list a svg.lucide { width: 13px; height: 13px; margin-left: 5px; color: var(--muted); }
+.outlet-score { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.outlet-score .score { font-weight: 600; color: var(--text-soft); min-width: 3.9em; text-align: right; }   /* fits "3.25/5", so the stars line up */
+.early-note { display: flex; align-items: center; gap: 6px; color: var(--text-soft); font-size: var(--fs-label); margin: -6px 0 10px; }
+.early-note svg.lucide { width: 14px; height: 14px; color: var(--gold); }
+.histogram { display: grid; gap: 6px; list-style: none; margin-top: 4px; }
+.histogram li { display: grid; grid-template-columns: 2.2em minmax(0, 1fr) 2.6em; gap: 10px; align-items: center; font-size: var(--fs-label); }
+.hist-label { color: var(--muted); font-weight: 500; }
+.hist-track { height: 6px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+.hist-track i { display: block; height: 100%; border-radius: 999px; background: var(--star); }
+.hist-count { color: var(--muted); text-align: right; }
+.overall-line {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 12px; padding: 16px 20px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+}
+.overall-line > svg.lucide { color: var(--muted); }
+.overall-line strong { font-size: var(--fs-ui); font-weight: 700; }
+.overall-line span:not(.score) { color: var(--muted); font-size: var(--fs-label); }
+
+/* ---------- Audience reviews ---------- */
+.reviews-layout { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 24px; align-items: start; }
+.review-form .panel-title { margin-bottom: 0; }
+.star-input { border: 0; min-width: 0; }
+/* Same label style as the other fields (.field label in style.css) */
+.star-input legend { margin: 0 0 6px 2px; color: var(--text-soft); font-size: var(--fs-small); font-weight: 600; line-height: 1.4; }
+.opt { color: var(--muted); font-weight: 500; }
+.star-row { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
+.star-row input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.star-row label {
+  font-size: 2rem; line-height: 1; padding: 2px 4px; border-radius: var(--radius-sm); cursor: pointer;
+  color: var(--muted); transition: color .15s, transform .15s var(--ease);
+}
+.star-row label:hover { transform: scale(1.1); }
+.star-row label.on { color: var(--star); }
+.star-row input:focus-visible + label { outline: 2px solid var(--gold); outline-offset: 1px; }
+.star-word { margin-left: 10px; color: var(--muted); font-size: var(--fs-label); font-weight: 500; font-variant-numeric: tabular-nums; }
+.char-count { margin-top: 4px; color: var(--muted); font-size: var(--fs-label); text-align: right; font-variant-numeric: tabular-nums; }
+.form-error { color: var(--danger); font-weight: 600; font-size: var(--fs-small); }
+.form-error:empty { display: none; }
+.review-form .btn[type="submit"] { justify-self: start; min-height: 44px; padding: 0 28px; }
+.review-form .fine-print { font-size: var(--fs-label); }
+.review-list-wrap .panel-title { margin-bottom: 14px; }
+.review-list { display: grid; gap: 10px; list-style: none; }
+.review { padding: 16px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.review.is-mine { border-color: rgba(var(--gold-rgb), .45); }
+.review-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.review-name { font-size: var(--fs-small); font-weight: 600; overflow-wrap: anywhere; }
+.you-badge { padding: 1px 8px; border-radius: 999px; background: rgba(var(--gold-rgb), .18); color: var(--gold-ink); font-size: var(--fs-label); font-weight: 600; line-height: 1.5; }
+.review-head time { margin-left: auto; color: var(--muted); font-size: var(--fs-label); }
+.review-text { margin-top: 8px; color: var(--text-soft); font-size: var(--fs-small); line-height: 1.6; white-space: pre-line; overflow-wrap: anywhere; }
+
+/* ---------- Sources & notes ---------- */
+.sources-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 28px; }
+.note-list { padding-left: 1.1em; color: var(--text-soft); font-size: var(--fs-small); }
+.note-list li + li { margin-top: 8px; }
+.source-list { list-style: none; }
+.source-list li { display: grid; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: var(--fs-small); }
+.source-list li:first-child { padding-top: 0; }
+.source-list li:last-child { border-bottom: 0; }   /* the footer rule below already separates it */
+.source-list a { color: var(--text-soft); text-decoration: underline; text-decoration-color: var(--border-strong); overflow-wrap: anywhere; }
+.source-list a:hover { color: var(--text); text-decoration-color: currentColor; }
+.source-list small { color: var(--muted); font-size: var(--fs-label); }
+.sources-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px 24px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
+.sources-foot .fine-print { font-size: var(--fs-label); }
+.sources-foot .fine-print p + p { margin-top: 3px; }
+.sources-foot .btn { white-space: normal; text-align: left; }
+
+/* ---------- More films ---------- */
+/* District card anatomy: poster on top, a 12px text block below; hover only brightens the border */
+.more-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 20px 16px; }
+.more-card {
+  display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+  transition: border-color .2s;
+}
+.more-card:hover { border-color: var(--border-strong); }
+.more-card .poster { border-radius: var(--radius-lg) var(--radius-lg) 0 0; box-shadow: none; }
+.more-info { padding: 12px; }
+.more-info h3 { font-family: var(--font-body); font-size: var(--fs-body); font-weight: 600; letter-spacing: -0.0125em; line-height: 1.35; }
+.more-info .meta { margin-top: 4px; color: var(--muted); font-size: var(--fs-label); font-weight: 500; }
+/* Verdict pill, then the India net figure on its own line, the same on every card */
+.more-figures { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 10px; color: var(--muted); font-size: var(--fs-label); font-weight: 500; }
+.more-figures .money { color: var(--text-soft); font-weight: 600; }
+.more-figures .verdict { max-width: 100%; white-space: normal; border-radius: var(--radius); }   /* "Trending: All-Time Blockbuster*" wraps in 2-up phone cards */
+
+/* ---------- Footer ---------- */
+/* A single row under the charcoal band: keep .container's auto side margins, drop the divider above it */
+.film-footer { margin-top: 0; padding-top: 0; border-top: 0; align-items: center; }
+.film-footer-back { display: inline-flex; align-items: center; gap: 6px; color: var(--text-soft); white-space: nowrap; text-decoration: none !important; }
+.film-footer-back:hover { color: var(--text); }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 980px) {
+  .reviews-layout { grid-template-columns: minmax(0, 1fr); }
+  .film-head { gap: 28px 36px; }
+}
+@media (max-width: 760px) {
+  .film-header { padding-top: 20px; }
+  /* Phones: the backdrop fills the top and fades down into the black; poster card above the title */
+  .film-backdrop { width: 100%; bottom: auto; height: 340px; transform-origin: center top; }
+  .film-header::before { background: linear-gradient(0deg, var(--bg) 52%, rgba(var(--bg-rgb), .7) 78%, rgba(var(--bg-rgb), .45) 100%); }
+  .film-back { margin-bottom: 20px; }
+  .film-head { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .film-head-poster { order: -1; width: 132px; }
+  .film-head h1 { letter-spacing: -0.5px; }
+  .film-desc { font-size: var(--fs-small); }
+  .film-ctas .btn { flex: 1 1 auto; padding: 0 20px; }
+  .film-tabs { margin-top: 28px; }
+  /* The row runs to the screen edges, so a tab cut off at the right shows it scrolls */
+  .film-tabs ul { margin-inline: -16px; padding-inline: 2px; }
+  section.film-section { margin-top: 44px; }
+  /* Four to a row; a long name keeps whole words */
+  .cast-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px 4px; }
+  .cast-person { width: auto; min-width: 0; }
+  .cast-avatar { width: 64px; height: 64px; font-size: 1.125rem; margin-bottom: 8px; }
+  .cast-name { font-size: var(--fs-label); letter-spacing: -0.01em; }
+  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .stat-tile { padding: 14px 16px; }
+  .stat-tile-verdict { grid-column: 1 / -1; }
+  .stat-tile-verdict .verdict { white-space: normal; }
+  /* A tile left alone on its row (just above the full-width verdict) takes the whole row; four tiles stay 2 × 2 */
+  .stat-grid:not(.stat-grid-4) > .stat-tile:nth-last-child(2):nth-child(odd) { grid-column: 1 / -1; }
+  .stat-grid-4 > .stat-tile-verdict { grid-column: auto; }
+  .film-head-poster .poster-text { padding: 12px; }
+  .film-head-poster .poster-text .poster-title { font-size: var(--fs-h4); letter-spacing: -0.02em; }
+  .stat-value { font-size: 1.25rem; }
+  .rating-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  .rating-grid > :first-child { grid-row: auto; }
+  .chart-head .seg { width: 100%; }
+  .chart-head .seg-btn { flex: 1; }
+  .chart-svg text, .chart-svg .chart-callout { font-size: 11px; }
+  .bo-table th, .bo-table td { padding: 10px 12px; }
+  .bo-table th:first-child { padding-left: 22px; }
+  .bo-table .is-weekend > th::before { left: 9px; }
+  .more-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
+}
+@media (max-width: 420px) {
+  .stat-value { font-size: 1.125rem; }
+  .stat-value .money { white-space: normal; }
+  .stat-tile { padding: 12px 14px; }
+  .rating-big .score { font-size: 2.25rem; }
+  .review-head time { margin-left: 0; width: 100%; }
+  .wk-legend { margin-left: 0; width: 100%; }
+  .no-days { gap: 12px; }
+  .no-days-icon { width: 36px; height: 36px; }
+  .no-days-icon svg.lucide { width: 18px; height: 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .star-row label:hover { transform: none; }
+}

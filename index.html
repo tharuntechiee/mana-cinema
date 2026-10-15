@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="MANA CINEMA tracks Indian films in every language by the numbers: Hindi, Telugu, Tamil, Malayalam, Kannada, Marathi, Bengali, Punjabi and Gujarati. Day-wise collections, biggest opening days, all-time top grossers, verdicts and ratings.">
+  <meta name="theme-color" content="#0F0F13">
+  <script>try{document.documentElement.dataset.theme=localStorage.getItem("manaLook")||"district"}catch(e){document.documentElement.dataset.theme="district"}</script>
+  <title>MANA CINEMA | Indian Box Office &amp; Ratings</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=3">
+</head>
+<body>
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  <nav class="navbar" aria-label="Main">
+    <div class="container nav-inner">
+      <a href="index.html" class="logo" aria-label="MANA CINEMA home"><span class="logo-mark"><i data-lucide="clapperboard"></i></span>MANA&nbsp;<span>CINEMA</span></a>
+      <button class="menu-btn" id="menuBtn" aria-label="Menu" aria-expanded="false" aria-controls="navLinks"><i data-lucide="menu"></i></button>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="#box-office">Box Office</a></li>
+        <li><a href="#films">Films</a></li>
+        <li><a href="lists.html">Lists</a></li>
+        <li><a href="#coming-soon">Coming Soon</a></li>
+        <li><a href="#about">How We Track</a></li>
+        <li><a href="#contact">Feedback</a></li>
+        <li><a href="#box-office" class="btn btn-primary nav-cta"><i data-lucide="trophy"></i> Leaderboard</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Cover page: the cover film (They Call Him OG). Tags, lead, credits and figures come from js/data.js -->
+  <section class="cover" id="cover" aria-labelledby="coverTitle">
+    <div class="cover-art" aria-hidden="true">
+      <span class="cover-smoke"></span>
+      <span class="cover-hero" id="coverHero"></span>
+      <span class="cover-photo"></span>
+      <span class="cover-og" id="coverOg">OG</span>
+      <span class="cover-slash"></span>
+      <span class="cover-grain"></span>
+    </div>
+    <div class="container cover-content">
+      <h1 id="coverTitle">
+        <span class="cover-pre" id="coverPre">They call him</span>
+        <span class="cover-name" id="coverName">OG</span>
+      </h1>
+      <div class="cover-facts" id="coverMeta">
+        <p class="pipe-line hero-line"><span><span class="sr-only">Certificate </span>A</span><span>Telugu</span><span>2h 34m</span><span><span class="sr-only">Released </span>25 Sep 2025</span></p>
+        <ul class="genre-pills" aria-label="Genre"><li class="tag">Action</li><li class="tag">Gangster Drama</li></ul>
+      </div>
+      <p class="cover-lead" id="coverLead">A feared gangster returns to Bombay after a decade away, and the city still remembers his name.</p>
+      <p class="credits cover-credits" id="coverCredits"><span>Director</span> Sujeeth <span>Starring</span> Pawan Kalyan, Emraan Hashmi, Priyanka Arul Mohan</p>
+      <div id="coverStats" hidden></div>
+      <div class="hero-actions">
+        <a href="film.html?id=10" class="btn btn-primary cover-btn" id="coverCta">Collections &amp; ratings</a>
+        <a href="#box-office" class="btn btn-ghost">Leaderboard</a>
+      </div>
+    </div>
+    <a href="#home" class="cover-scroll" aria-label="Scroll to featured films"><i data-lucide="chevron-down"></i></a>
+  </section>
+
+  <!-- Featured films: the biggest Telugu worldwide grossers (the rest of India is on the leaderboard and in Lists) -->
+  <section class="hero" id="home" aria-roledescription="carousel" aria-label="Featured Telugu films">
+    <div class="container hero-inner">
+      <div class="hero-main">
+        <div class="hero-content" id="heroContent" aria-live="polite"></div>
+        <div class="hero-controls">
+          <button type="button" class="hero-pause" id="heroPause" aria-label="Pause featured films"><i data-lucide="pause"></i></button>
+          <div class="hero-dots" id="heroDots" role="group" aria-label="Choose featured film"></div>
+        </div>
+      </div>
+      <div class="hero-poster" id="heroPoster" aria-hidden="true"></div>
+    </div>
+  </section>
+
+  <main id="main">
+    <!-- Box-office pulse: four headline numbers -->
+    <div class="container">
+      <ul class="pulse-strip reveal" id="pulse" aria-label="Box office at a glance"></ul>
+    </div>
+
+    <section id="box-office" aria-labelledby="boardTitle">
+      <div class="container">
+        <div class="section-head reveal">
+          <div>
+            <h2 id="boardTitle">Box office leaderboard</h2>
+            <p class="section-intro">Films in every Indian language, ranked on trade figures from the opening day to the lifetime total.</p>
+          </div>
+        </div>
+        <div class="board-panel reveal">
+          <div class="board-controls">
+            <div class="board-control">
+              <span class="board-label" id="boardMetricLabel">Rank by</span>
+              <div class="chips" id="boardMetrics" role="group" aria-labelledby="boardMetricLabel"></div>
+            </div>
+            <div class="board-control">
+              <span class="board-label" id="boardLangLabel">Language</span>
+              <div class="chips" id="boardLangs" role="group" aria-labelledby="boardLangLabel"></div>
+            </div>
+            <div class="board-control">
+              <span class="board-label" id="boardYearLabel">Year</span>
+              <div class="chips" id="boardYears" role="group" aria-labelledby="boardYearLabel"></div>
+            </div>
+            <label class="toggle-check" id="boardPreviewsWrap"><input type="checkbox" id="boardPreviews" checked> Include paid previews</label>
+          </div>
+          <div class="board-notes">
+            <p class="fine-print" id="boardNote"></p>
+            <p class="fine-print">Films without day-by-day figures appear only in Opening day, India net, Worldwide gross and Top rated.</p>
+            <p class="fine-print">An asterisk (*) on a verdict means it is indicative or the film is still running.</p>
+          </div>
+          <p class="sr-only" id="boardStatus" role="status"></p>
+          <div id="boardList"></div>
+          <div class="board-foot">
+            <button type="button" class="btn btn-ghost btn-sm board-more" id="boardMore" aria-expanded="false" aria-controls="boardList" hidden></button>
+            <a href="lists.html" class="more-link" id="boardLists" hidden></a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="films" class="section-alt" aria-labelledby="filmsTitle">
+      <div class="container">
+        <div class="section-head reveal">
+          <div>
+            <h2 id="filmsTitle">Films</h2>
+            <p class="section-intro">Every released film we track, in every language, with its collections and ratings.</p>
+          </div>
+          <div class="toolbar">
+            <label class="search film-search">
+              <span class="sr-only">Search by title, genre, director, cast or language</span>
+              <i data-lucide="search" class="search-icon"></i>
+              <input type="search" id="filmSearch" placeholder="Title, cast, director, language" autocomplete="off">
+            </label>
+            <label class="sort-field">
+              <span>Sort</span>
+              <select id="filmSort">
+                <option value="latest">Latest release</option>
+                <option value="worldwide">Worldwide gross</option>
+                <option value="opening">Opening day</option>
+                <option value="rating">Top rated</option>
+                <option value="title">Title A-Z</option>
+              </select>
+            </label>
+          </div>
+        </div>
+        <div class="film-filters reveal">
+          <div class="filter-row">
+            <span class="board-label" id="filmLangLabel">Language</span>
+            <div class="chips" id="filmLangs" role="group" aria-labelledby="filmLangLabel"></div>
+          </div>
+          <div class="filter-row">
+            <span class="board-label" id="filmYearLabel">Year</span>
+            <div class="chips" id="filmYears" role="group" aria-labelledby="filmYearLabel"></div>
+          </div>
+        </div>
+        <p class="sr-only" id="filmStatus" role="status"></p>
+        <div class="movie-grid" id="filmGrid"></div>
+        <div class="grid-foot" id="filmFoot">
+          <p class="grid-count" id="filmCount"></p>
+          <button type="button" class="btn btn-ghost" id="filmMore" aria-controls="filmGrid" hidden><i data-lucide="chevron-down"></i> Show more</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="coming-soon" aria-labelledby="soonTitle">
+      <div class="container">
+        <div class="section-head reveal">
+          <div>
+            <h2 id="soonTitle">Coming soon</h2>
+            <p class="section-intro">Announced films, soonest first. Ask for a reminder and we'll flag the film here once it's out.</p>
+          </div>
+        </div>
+        <div class="movie-grid" id="soonGrid"></div>
+      </div>
+    </section>
+
+    <section id="about" class="section-alt" aria-labelledby="aboutTitle">
+      <div class="container about-grid track-grid">
+        <div class="reveal">
+          <h2 id="aboutTitle">How we track the numbers</h2>
+          <p>We cover Indian cinema in nine languages: Hindi, Telugu, Tamil, Malayalam, Kannada, Marathi, Bengali, Punjabi and Gujarati. Day-wise India net comes from trade trackers, mostly Sacnilk, cross-checked with Koimoi and Bollywood Hungama; the all-time lists start from Wikipedia's language lists and are checked against the same trackers.</p>
+          <p>For older and smaller films we list the reported totals and opening day; day-by-day figures are shown where trackers publish them.</p>
+          <p>Every figure is a trade estimate, not an audited number. Makers' claims are shown separately on film pages and are never ranked. A day nobody reported is left blank, never counted as zero, so running totals stop at the gap.</p>
+          <p>Verdicts come from the trade. Until a film has one, we show an indicative verdict based on its lifetime India net against its budget (Koimoi's bands). An asterisk (*) marks an indicative verdict, or a film still in theatres whose verdict may change.</p>
+          <dl class="stats track-stats" id="trackStats"></dl>
+        </div>
+        <dl class="features glossary">
+          <div class="feature reveal"><div class="feature-icon"><i data-lucide="indian-rupee"></i></div><dt>India net</dt><dd>Box-office takings in India after GST. Every day-wise figure here is India net.</dd></div>
+          <div class="feature reveal"><div class="feature-icon"><i data-lucide="receipt-indian-rupee"></i></div><dt>India gross</dt><dd>India takings including GST, usually 12 to 18% above net.</dd></div>
+          <div class="feature reveal"><div class="feature-icon"><i data-lucide="globe"></i></div><dt>Worldwide gross</dt><dd>India gross plus overseas gross. Net and gross are never mixed.</dd></div>
+          <div class="feature reveal"><div class="feature-icon"><i data-lucide="moon-star"></i></div><dt>Paid previews (Day 0)</dt><dd>Premieres the night before release, reported apart from Day 1. Counted in the opening unless you switch them off.</dd></div>
+          <div class="feature reveal"><div class="feature-icon"><i data-lucide="calendar-range"></i></div><dt>Opening weekend</dt><dd>Release day to the first Sunday, so a Thursday release gets a 4-day weekend. Monday and Tuesday releases aren't ranked on it; compare them on First 7 days.</dd></div>
+          <div class="feature reveal"><div class="feature-icon"><i data-lucide="calendar-days"></i></div><dt>Trade week</dt><dd>Friday to Thursday. A Thursday release has an 8-day first week.</dd></div>
+          <div class="feature reveal"><div class="feature-icon"><i data-lucide="gavel"></i></div><dt>Verdict</dt><dd>The trade's call on how a film did against its cost, from Disaster to All-Time Blockbuster.</dd></div>
+          <div class="feature reveal"><div class="feature-icon"><i data-lucide="star"></i></div><dt>Ratings</dt><dd>Critics' average out of 10, an IMDb snapshot, and audience stars saved in this browser.</dd></div>
+        </dl>
+      </div>
+    </section>
+
+    <section id="contact" aria-labelledby="contactTitle">
+      <div class="container">
+        <div class="contact-card reveal">
+          <div>
+            <h2 id="contactTitle">Feedback &amp; corrections</h2>
+            <p class="contact-intro">Spotted a wrong figure or want a film tracked? Tell us here.</p>
+            <ul class="contact-info">
+              <li><span class="feature-icon"><i data-lucide="map-pin"></i></span><div><strong>Based in</strong>Hyderabad, Telangana</div></li>
+            </ul>
+          </div>
+          <form id="contactForm">
+            <div class="form-row">
+              <div class="field"><label for="cName">Name</label><input id="cName" type="text" placeholder="Your name" required maxlength="60" autocomplete="name"></div>
+              <div class="field"><label for="cEmail">Email</label><input id="cEmail" type="email" placeholder="you@example.com" required maxlength="120" autocomplete="email"></div>
+            </div>
+            <div class="form-row">
+              <div class="field">
+                <label for="cTopic">Topic</label>
+                <select id="cTopic" required>
+                  <option value="">Choose a topic</option>
+                  <option>Report a wrong figure</option>
+                  <option>Suggest a film to track</option>
+                  <option>Ratings or reviews</option>
+                  <option>Other feedback</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="cFilm">Film <span class="optional">(optional)</span></label>
+                <select id="cFilm"><option value="">Not about a specific film</option></select>
+              </div>
+            </div>
+            <div class="field"><label for="cMsg">Message</label><textarea id="cMsg" rows="5" placeholder="What's on your mind?" required maxlength="1000"></textarea></div>
+            <button class="btn btn-primary form-submit" type="submit">Send message</button>
+            <p class="form-msg" id="formMsg" role="status"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-top">
+        <a href="index.html" class="logo"><span class="logo-mark"><i data-lucide="clapperboard"></i></span>MANA&nbsp;<span>CINEMA</span></a>
+      </div>
+      <div class="footer-grid">
+        <div class="footer-about">
+          <h4>About</h4>
+          <p>Indian cinema by the numbers: day-by-day collections, all-time lists, verdicts and ratings in every language.</p>
+        </div>
+        <div>
+          <h4>Explore</h4>
+          <ul><li><a href="#box-office">Box office</a></li><li><a href="#films">Films</a></li><li><a href="lists.html">Lists</a></li><li><a href="#coming-soon">Coming soon</a></li><li><a href="#about">How we track</a></li></ul>
+        </div>
+        <div>
+          <h4>Help</h4>
+          <ul><li><a href="#contact">Feedback</a></li><li><a href="#contact" data-topic="Report a wrong figure">Report a wrong figure</a></li><li><a href="admin.html">Admin</a></li></ul>
+        </div>
+        <div>
+          <h4>Data</h4>
+          <ul><li class="footer-note">Sacnilk, Koimoi, Bollywood Hungama, Wikipedia</li><li class="footer-note" id="asOfItem"><span id="asOf">Trade estimates</span></li></ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; 2026 MANA CINEMA. All rights reserved.</span>
+        <span>A project-based design · Photos via Wikimedia Commons: <a href="https://commons.wikimedia.org/wiki/File:The_portrait_of_Pawan_Kalyan_(2024).jpg" target="_blank" rel="noopener">Pawan Kalyan</a> (PMO/PIB, GODL-India) · <a href="https://commons.wikimedia.org/wiki/File:Prabhas_and_Deepika_Padukone_at_launch_event_in_Mumbai.jpg" target="_blank" rel="noopener">Prabhas &amp; Deepika Padukone</a> (Bollywood Hungama, CC BY 3.0) · <a href="https://commons.wikimedia.org/wiki/File:Allu_Arjun_at_Pushpa_2_The_Rule_meet.jpg" target="_blank" rel="noopener">Allu Arjun</a> (Bollywood Hungama, CC BY 3.0) · <a href="https://commons.wikimedia.org/wiki/File:N._T._Rama_Rao_Jr._in_2021.jpg" target="_blank" rel="noopener">N. T. Rama Rao Jr.</a> (Silverscreen Media, CC BY-SA 3.0)</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/films-india.js?v=3"></script>
+  <script src="js/data.js?v=3"></script>
+  <script src="js/art.js?v=3"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" integrity="sha384-ieG+IKD0d/ZPXyCBTMVAbqsQdns8QGJR/e26WMw7M4fkaI/rHcS/YIoi+ah9WGge" crossorigin="anonymous"></script>
+  <script src="js/ui.js?v=3"></script>
+  <script src="js/boxoffice.js?v=3"></script>
+  <script src="js/main.js?v=3"></script>
+</body>
+</html>

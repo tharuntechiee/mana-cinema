@@ -1,0 +1,11 @@
+# Local Claude Code tooling and skills (not part of the website)
+.claude/
+
+# Backup of the old ticket-booking version
+backup-*.zip
+
+# OS / editor clutter
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/

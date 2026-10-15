@@ -1,0 +1,511 @@
+/* MANA CINEMA admin portal: builds on the site's theme tokens in style.css.
+   Same anatomy as the public site: flat 16px cards with hairlines, pill tabs (current = tinted --gold),
+   white primary buttons, ghost secondary buttons, blue (--gold) for selection, no glows or lifts. */
+
+/* ---------- Sign in ---------- */
+.admin-login { min-height: 100svh; display: grid; place-items: center; padding: 24px 16px; background: var(--bg); }
+.login-card {
+  width: min(400px, 100%); display: grid; gap: 16px; padding: 32px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+}
+.login-card .logo { justify-self: start; margin-bottom: 12px; }
+.login-card h1 { font-size: 1.5rem; letter-spacing: -0.02em; }
+.login-card h1 + .muted { margin-top: -8px; font-size: var(--fs-small); line-height: 1.55; }
+.login-card .btn-primary { min-height: 48px; }
+/* The empty line keeps the height of one error line, so the card doesn't grow when an error appears */
+.login-error { color: var(--danger); font-size: var(--fs-small); font-weight: 600; line-height: 1.5; min-height: 1.5em; margin-top: -4px; }
+.admin-back { justify-self: start; display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-weight: 600; font-size: var(--fs-small); }
+.admin-back:hover { color: var(--text); }
+
+/* ---------- Layout ---------- */
+.admin-app { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100svh; }
+.admin-side {
+  position: sticky; top: 0; height: 100svh; display: flex; flex-direction: column; gap: 28px;
+  padding: 24px 14px; background: var(--surface-2); border-right: 1px solid var(--border);
+}
+/* Be Vietnam Pro is wide: this size keeps the wordmark inside the 248px sidebar */
+.admin-side a.logo { font-size: 1.25rem; padding: 0 8px; }
+
+/* Sidebar tabs: pills like the public navbar, the current one a tinted --gold pill */
+.admin-nav { display: grid; gap: 4px; }
+.admin-nav button {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 40px; padding: 8px 14px; border-radius: 999px;
+  background: none; border: 0; color: var(--text-soft); font-weight: 600; font-size: var(--fs-small); line-height: 1.45;
+  cursor: pointer; text-align: left; transition: background .2s, color .2s;
+}
+.admin-nav button svg.lucide { width: 18px; height: 18px; }
+.admin-nav button:hover { color: var(--text); background: rgba(var(--gold-rgb), .12); }
+.admin-nav button[aria-current="page"] { color: var(--gold-ink); background: rgba(var(--gold-rgb), .2); }
+.nav-badge {
+  margin-left: auto; min-width: 22px; padding: 0 7px; border-radius: 999px; background: var(--accent); color: var(--on-accent);
+  font-size: var(--fs-label); font-weight: 700; line-height: 1.6; text-align: center; font-variant-numeric: tabular-nums;
+}
+.admin-side-foot { margin-top: auto; display: grid; gap: 8px; justify-items: start; padding-top: 16px; border-top: 1px solid var(--border); }
+.admin-side-foot .link-btn { padding-left: 4px; }
+
+.admin-main { padding: 0 32px 64px; min-width: 0; }
+.admin-top { height: 88px; display: flex; align-items: center; gap: 10px; }
+.admin-top h1 { font-size: var(--fs-h2); letter-spacing: -0.02em; margin-right: auto; }
+.admin-top h1:focus { outline: none; }
+.admin-top .theme-wrap { margin-left: 0; }
+.mobile-only { display: none; }
+.admin-view { padding: 0 0 8px; animation: rise .4s var(--ease) both; }
+.admin-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+.admin-toolbar > p.muted { font-size: var(--fs-small); }
+.admin-toolbar .search { width: min(380px, 100%); }
+.filter-bar { align-items: end; }   /* the search box lines up with the film list, not its label */
+.admin-cols { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.admin-cols .panel + .panel { margin-top: 0; }
+.admin-cols > div > .panel + .panel { margin-top: 20px; }
+.admin-view > .panel + .panel, .admin-cols + .panel { margin-top: 20px; }
+
+/* Panel headings are h2 here (the view title is the h1); same look as the site's panel titles */
+.panel-title { flex-wrap: wrap; }
+.panel-title h2 {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-body); font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.01em; line-height: 1.3;
+}
+.panel-title h2 svg.lucide { width: 18px; height: 18px; color: var(--accent); }
+.panel-title small { font-size: var(--fs-small); }
+.sub-head { font-family: var(--font-body); font-size: var(--fs-ui); font-weight: 700; letter-spacing: -0.01em; margin: 24px 0 10px; }
+.panel-copy { margin-bottom: 18px; font-size: var(--fs-small); line-height: 1.6; }
+
+/* ---------- Text buttons ---------- */
+.link-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 2px; background: none; border: 0; cursor: pointer;
+  color: var(--text-soft); font-weight: 600; font-size: var(--fs-small); line-height: 1.45;
+  text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px;
+  transition: color .2s, text-decoration-color .2s;
+}
+.link-btn:hover { color: var(--text); text-decoration-color: currentColor; }
+/* Destructive actions read red at rest, not only on hover */
+.link-btn.danger, .link-btn.danger:hover { color: var(--danger); }
+.link-btn svg.lucide { width: 15px; height: 15px; }
+.plain-link {
+  background: none; border: 0; padding: 0; cursor: pointer; color: inherit; font: inherit; font-weight: 600; text-align: left;
+  text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px;
+}
+.plain-link:hover { color: var(--gold-ink); text-decoration-color: currentColor; }
+/* Small square buttons in table rows: every one removes the row */
+.icon-btn-sm { width: 34px; height: 34px; border-radius: var(--radius-btn); background: none; border-color: transparent; color: var(--muted); }
+.icon-btn-sm:hover { background: var(--ghost); border-color: transparent; color: var(--danger); }
+.icon-btn-sm svg.lucide { width: 16px; height: 16px; }
+.btn.danger { color: var(--danger); }
+
+/* ---------- Status pills ---------- */
+/* Overrides the site's filter-chip look: these are labels, not buttons */
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; border-radius: 999px; border: 0; cursor: default;
+  font-size: var(--fs-label); font-weight: 600; line-height: 1.6; background: var(--ghost); color: var(--text-soft); white-space: nowrap;
+}
+.chip:hover { color: var(--text-soft); border-color: transparent; }
+.chip svg.lucide { width: 12px; height: 12px; }
+.chip-ok, .chip-ok:hover { background: rgba(52, 211, 153, .14); color: var(--success); }
+.chip-accent, .chip-accent:hover { background: rgba(var(--gold-rgb), .16); color: var(--gold-ink); }
+.chip-new, .chip-new:hover { background: var(--accent); color: var(--on-accent); }
+.chip-film, .chip-film:hover { background: var(--ghost); color: var(--text); }
+@supports (color: color-mix(in srgb, red 50%, transparent)) {
+  .chip-ok, .chip-ok:hover { background: color-mix(in srgb, var(--success) 14%, transparent); }
+}
+.chip-row { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.save-state { font-size: var(--fs-small); font-weight: 600; color: var(--muted); }
+.save-state.dirty { color: var(--warn); }
+.save-state.dirty::before { content: "● "; }
+
+.empty-line { color: var(--muted); font-size: var(--fs-small); padding: 6px 0 2px; }
+.admin-empty { display: grid; justify-items: center; gap: 10px; padding: 32px 16px; text-align: center; color: var(--muted); font-size: var(--fs-small); list-style: none; }
+.admin-empty svg { width: 28px; height: 28px; color: var(--text-soft); }
+
+/* ---------- Stats ---------- */
+.stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
+.stat {
+  display: flex; gap: 14px; align-items: center; padding: 20px; border-radius: var(--radius-lg); width: 100%; min-width: 0;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text); font: inherit; text-align: left; cursor: pointer;
+  transition: border-color .2s, background .2s;
+}
+.stat:hover { border-color: var(--border-strong); }
+.stat > span:last-child { min-width: 0; }
+.stat-icon {
+  width: 40px; height: 40px; border-radius: var(--radius); display: grid; place-items: center; flex: 0 0 auto;
+  background: rgba(var(--accent-rgb), .12); color: var(--accent);
+}
+.stat-icon svg.lucide { width: 20px; height: 20px; }
+.stat small { display: block; color: var(--muted); font-size: var(--fs-label); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; line-height: 1.5; }
+.stat strong { display: block; font-weight: 700; font-size: var(--fs-h3); letter-spacing: -0.02em; line-height: 1.2; margin: 4px 0 2px; }
+.stat em { display: block; font-style: normal; font-size: var(--fs-small); color: var(--text-soft); font-weight: 500; line-height: 1.45; }
+/* Four tiles in a row: icon on top, so labels and notes get the full tile width */
+@media (min-width: 1101px) {
+  .stat { flex-direction: column; align-items: flex-start; gap: 14px; }
+}
+
+/* ---------- Films by language (dashboard) ---------- */
+/* One tile per language, three to a row; each opens Films filtered to it */
+.lang-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.lang-tile {
+  display: grid; justify-items: start; align-content: start; gap: 2px; min-width: 0; padding: 12px; border-radius: var(--radius);
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text); font: inherit; text-align: left; cursor: pointer;
+  transition: border-color .2s, background .2s;
+}
+.lang-tile:hover { border-color: var(--border-strong); background: var(--surface-3); }
+.lang-tile span { font-size: var(--fs-small); font-weight: 600; color: var(--text-soft); line-height: 1.4; }
+.lang-tile strong { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.3; font-variant-numeric: tabular-nums; }
+.lang-tile small { color: var(--muted); font-size: var(--fs-label); font-weight: 500; line-height: 1.4; }
+.lang-tile span, .lang-tile small { max-width: 100%; overflow-wrap: anywhere; }
+
+/* ---------- Worldwide gross bars ---------- */
+.bar-list { display: grid; gap: 16px; }
+/* The value column has a fixed minimum so every row's track starts and ends at the same place (bars stay comparable) */
+.bar-row { display: grid; grid-template-columns: minmax(130px, 1.1fr) 1.6fr minmax(6.5em, auto); gap: 14px; align-items: center; }
+.bar-label { display: grid; justify-items: start; gap: 4px; font-size: var(--fs-small); line-height: 1.3; min-width: 0; }
+.bar-label .verdict { font-size: .6875rem; padding: 0 8px; }
+/* Rank, title, then language · year and the verdict under the title */
+.bar-name { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.bar-rank { flex: 0 0 1.5em; color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
+.bar-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding-left: calc(1.5em + 8px); }
+.bar-meta small { color: var(--muted); font-size: var(--fs-label); font-weight: 500; }
+.panel-foot { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+/* Thin rounded bars: --accent (white in District Black); the row being pointed at turns --gold */
+.bar-track { height: 6px; border-radius: 999px; background: var(--ghost); overflow: hidden; }
+.bar-fill { display: block; height: 100%; min-width: 4px; border-radius: inherit; background: var(--accent); transition: width .6s var(--ease), background .2s; }
+.bar-row:hover .bar-fill, .bar-row:focus-within .bar-fill { background: var(--gold); }
+.bar-value { text-align: right; font-weight: 700; font-size: var(--fs-small); }
+.bar-list .fine-print { margin-top: 2px; }
+
+/* ---------- Needs attention ---------- */
+.attention-list { list-style: none; display: grid; gap: 8px; }
+.attention {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start; width: 100%; padding: 12px 14px;
+  border-radius: var(--radius); border: 1px solid var(--border); background: none; color: var(--text-soft);
+  font: inherit; font-size: var(--fs-small); line-height: 1.5; text-align: left; cursor: pointer; transition: border-color .2s, background .2s;
+}
+.attention:hover { border-color: var(--border-strong); background: var(--surface-2); }
+.attention strong { color: var(--text); font-weight: 600; }
+.attention > svg.lucide { margin-top: 2px; width: 16px; height: 16px; }
+.attention .go-icon { color: var(--muted); }
+.attention-warn > svg.lucide:first-child { color: var(--warn); }
+.attention-todo > svg.lucide:first-child { color: var(--gold); }
+.attention-info > svg.lucide:first-child { color: var(--muted); }
+.attention-more { display: flex; justify-content: center; padding-top: 4px; }
+
+/* ---------- Audience review feed (dashboard) ---------- */
+.review-feed { list-style: none; display: grid; }
+.review-item { padding: 14px 0; border-bottom: 1px solid var(--border); }
+.review-item:first-child { padding-top: 0; }
+.review-item:last-child { border-bottom: 0; padding-bottom: 0; }
+.review-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: var(--fs-small); }
+.review-head strong { font-weight: 600; }
+.review-head small { margin-left: auto; font-size: var(--fs-label); font-weight: 500; }
+.review-item p { color: var(--text-soft); font-size: var(--fs-small); margin-top: 4px; white-space: pre-line; overflow-wrap: anywhere; }
+
+/* ---------- Tables ---------- */
+/* position: relative keeps .sr-only text inside the scroll box, so it can't widen the page */
+.table-wrap { position: relative; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.admin-table { width: 100%; border-collapse: collapse; font-size: var(--fs-small); font-variant-numeric: tabular-nums; }
+.admin-table th {
+  text-align: left; color: var(--muted); font-size: var(--fs-label); font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.admin-table td { padding: 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.admin-table tr:last-child td { border-bottom: 0; }
+.admin-table tbody tr { transition: background .15s; }
+.admin-table tbody tr:hover { background: var(--surface-2); }
+.admin-table small { display: block; color: var(--muted); font-size: var(--fs-label); }
+.admin-table .num { text-align: right; white-space: nowrap; }
+
+/* Inputs inside tables */
+.edit-table td, .day-table td { padding: 6px; vertical-align: middle; }
+.edit-table th, .day-table th { padding: 8px 6px; }
+.cell-input { padding: 8px 10px; border-radius: var(--radius-btn); font-size: var(--fs-ui); min-width: 0; font-variant-numeric: tabular-nums; }
+.cell-input[aria-invalid="true"] { border-color: var(--danger); }
+input[type="number"] { font-variant-numeric: tabular-nums; }
+
+/* ---------- Films ---------- */
+/* Search, then the language pills; minmax(0, 1fr) lets the pills scroll inside the column on phones */
+.film-filters { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; margin-bottom: 16px; }
+.film-filters .search { width: min(380px, 100%); }
+/* Filter pills keep the site's filter-chip look (the admin's own .chip is a status label) */
+.filter-chips .chip {
+  gap: 6px; padding: 7px 14px; border: 1px solid transparent; cursor: pointer; font-size: var(--fs-small); line-height: 1.45;
+  transition: background .2s, color .2s, border-color .2s;
+}
+.filter-chips .chip:hover { color: var(--text); border-color: var(--border-strong); }
+.filter-chips .chip[aria-pressed="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
+.chip-count { font-weight: 500; opacity: .7; font-variant-numeric: tabular-nums; }
+.film-results { color: var(--muted); font-size: var(--fs-small); margin-bottom: 12px; }
+.film-results:empty { display: none; }
+.list-more { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px 16px; margin-top: 20px; }
+.list-more:empty { display: none; }
+.admin-film-list .admin-empty .btn { margin-top: 4px; }
+.admin-film-list { display: grid; gap: 12px; }
+.admin-film {
+  display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 18px; align-items: center;
+  padding: 12px; border-radius: var(--radius-lg); background: var(--surface); border: 1px solid var(--border); transition: border-color .2s;
+}
+.admin-film:hover, .admin-film:focus-within { border-color: var(--border-strong); }
+.admin-film .poster { padding: 0; border-radius: var(--radius-sm); }
+.admin-film h3 {
+  font-family: var(--font-body); font-size: var(--fs-body); font-weight: 600; letter-spacing: -0.0125em; line-height: 1.35;
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+}
+.admin-film .meta { color: var(--muted); font-size: var(--fs-small); margin-top: 4px; }
+.nowrap { white-space: nowrap; }
+.film-status { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.admin-film-actions { display: flex; gap: 6px 12px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+
+/* ---------- Editor shared pieces ---------- */
+.picker { min-width: min(340px, 100%); }
+/* Film search + film menu side by side; the match count sits at the end of the search's label */
+.picker-group { display: flex; flex-wrap: wrap; align-items: end; gap: 12px 14px; min-width: 0; }
+/* Fixed flex bases: a menu is otherwise as wide as its longest film title */
+.picker-group .find { flex: 0 1 200px; margin: 0; }
+.picker-group .picker { flex: 0 1 340px; margin: 0; }
+.picker-group select { text-overflow: ellipsis; }
+.find-count { color: var(--muted); font-size: var(--fs-label); font-weight: 600; white-space: nowrap; }
+.lang-other { margin-top: 8px; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px 14px; }
+.lang-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+/* Each field shares three rows with its neighbours (label, input, hint), so the inputs in a row
+   line up even when one label wraps to two lines or only some fields have a hint */
+@supports (grid-template-rows: subgrid) {
+  .form-grid { row-gap: 0; margin-bottom: -16px; }
+  .form-grid > .field { display: grid; grid-row: span 3; grid-template-rows: subgrid; row-gap: 0; padding-bottom: 16px; }
+  .form-grid > .field > label, .form-grid > .field > .label-row { align-self: end; }
+}
+.field-hint { display: block; color: var(--muted); font-size: var(--fs-label); line-height: 1.45; margin: 6px 0 0 2px; }
+/* A label with a small text button at its end ("Today") */
+.label-row { position: relative; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 0 0 6px 2px; }
+.field .label-row label { margin: 0; }
+.label-row .link-btn { margin: -4px 0; padding: 4px 2px; }
+.row-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+.row-actions .spacer { flex: 1; }
+.check { display: flex; gap: 10px; align-items: center; font-size: var(--fs-small); font-weight: 600; color: var(--text-soft); cursor: pointer; margin-top: 18px; }
+.check input { width: 18px; height: 18px; flex: 0 0 auto; padding: 0; accent-color: var(--gold); }
+.dialog-body .check { margin-top: 0; }
+code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: .9em; padding: 1px 6px; border-radius: 6px; background: var(--ghost); white-space: nowrap; }
+
+/* Validation results */
+.check-list { list-style: none; display: grid; gap: 8px; margin-top: 14px; }
+.check-list:empty { display: none; }
+.check-list li { display: grid; grid-template-columns: auto 1fr; gap: 8px; font-size: var(--fs-small); line-height: 1.45; color: var(--text-soft); }
+.check-list svg.lucide { margin-top: 2px; width: 16px; height: 16px; }
+.check-error svg.lucide { color: var(--danger); }
+.check-error { color: var(--text) !important; }
+.check-warn svg.lucide { color: var(--warn); }
+.check-ok svg.lucide { color: var(--success); }
+
+/* ---------- Collections ---------- */
+.editor-bar { align-items: end; }
+.editor-bar .field { margin: 0; }
+.editor-bar-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.film-context { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: -6px 0 20px; color: var(--muted); font-size: var(--fs-small); }
+.co-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
+/* Editor forms flow as plain blocks so wide tables scroll inside their own wrappers */
+.co-editor, .critics-panel { display: block; min-width: 0; }
+.co-editor .panel + .panel { margin-top: 20px; }
+
+/* Day-wise table: hairline rows, tabular figures, weekend (Fri–Sun) dates in --gold */
+.day-wrap { margin: 0 -6px; }
+/* Sized so all six columns, the remove button included, fit beside the summary from 1221px up
+   (narrower screens stack the summary under the editor, see Responsive) */
+.day-table { min-width: 520px; }
+.day-table .cell-day { width: 64px; }
+.day-table .cell-net { width: 96px; text-align: right; }
+.day-table .cell-note { min-width: 88px; }
+.date-cell { white-space: nowrap; color: var(--text-soft); }
+.wkend, .wkend-key { color: var(--gold-ink); font-weight: 600; }
+.cum-cell { color: var(--muted); }
+.critic-table { min-width: 620px; }
+.critic-table .cell-score { width: 92px; }
+.source-table { min-width: 480px; }
+.source-table td:first-child { width: 42%; }
+
+.paste { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
+.paste summary {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer; list-style: none;
+  font-weight: 600; font-size: var(--fs-small); color: var(--text-soft); border-radius: var(--radius-sm);
+}
+.paste summary:hover { color: var(--text); }
+.paste summary::-webkit-details-marker { display: none; }
+.paste summary::after { content: "▾"; color: var(--muted); transition: transform .2s; }
+.paste[open] summary::after { transform: rotate(180deg); }
+.paste summary svg.lucide { width: 16px; height: 16px; }
+.paste-body { display: grid; gap: 10px; margin-top: 12px; }
+.paste-body label { color: var(--text-soft); font-size: var(--fs-small); line-height: 1.7; }
+.paste-body textarea { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: var(--fs-small); }
+.paste-result { font-size: var(--fs-small); color: var(--text-soft); }
+.paste-result:empty { display: none; }
+.skip-list { margin: 6px 0 0 18px; color: var(--muted); display: grid; gap: 2px; }
+.skip-list q { color: var(--text-soft); overflow-wrap: anywhere; }
+.notes-field { margin-top: 20px; }
+
+/* Reported opening day: whether the website uses it for this film */
+.opening-use {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; margin-top: 16px; padding: 12px 14px;
+  border-radius: var(--radius); background: var(--surface-2); color: var(--text-soft); font-size: var(--fs-small); line-height: 1.5;
+}
+.opening-use:empty { display: none; }
+.opening-use svg.lucide { width: 16px; height: 16px; margin-top: 2px; color: var(--muted); }
+.opening-use strong { color: var(--text); font-weight: 700; }
+
+/* Live summary */
+/* Taller than most screens: it scrolls on its own, so its checks and Save button stay reachable while the editor scrolls */
+.co-summary {
+  position: sticky; top: 20px; display: grid; gap: 4px; padding: 20px;
+  max-height: calc(100svh - 40px); overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; scrollbar-color: var(--ghost-strong) transparent;
+}
+.sum-head { display: grid; gap: 2px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.sum-head strong { font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.01em; line-height: 1.3; }
+.sum-head small { color: var(--muted); font-size: var(--fs-small); }
+.sum-list { display: grid; }
+/* Label left, figure right; the note under them gets the full width so neither side gets squeezed */
+.sum-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; column-gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--border); font-size: var(--fs-small); line-height: 1.45;
+}
+.sum-row dt { color: var(--muted); font-weight: 500; }
+.sum-row dd { text-align: right; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.sum-row dd .muted { font-weight: 500; }
+.sum-row .sum-note { grid-column: 1 / -1; margin-top: 2px; font-weight: 500; color: var(--muted); font-size: var(--fs-label); text-wrap: balance; }
+/* A verdict's source is a sentence, not a footnote to the figure: it reads left to right under the row */
+.sum-row .sum-source { text-align: left; }
+.sum-actions { display: grid; justify-items: center; gap: 6px; margin-top: 16px; }
+
+/* ---------- Ratings ---------- */
+/* Film picker, then the four live scores in one row under it */
+.critics-head { display: grid; gap: 16px; margin-bottom: 24px; }
+.critics-head .picker { width: min(340px, 100%); }
+.critics-preview { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.critics-preview > div { padding: 12px 14px; border-radius: var(--radius); background: var(--surface-2); border: 1px solid var(--border); }
+/* Sentence case, not the uppercase micro-label: "IMDb" must keep its lower-case b */
+.critics-preview small { display: block; color: var(--muted); font-size: var(--fs-small); font-weight: 600; line-height: 1.5; }
+.critics-preview strong { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.3; margin-right: 6px; }
+.critics-preview em { display: block; font-style: normal; color: var(--muted); font-size: var(--fs-label); font-weight: 500; }
+.imdb-row { border: 0; padding: 0; margin: 0; min-width: 0; }
+.imdb-row legend { font-weight: 700; font-size: var(--fs-ui); margin-bottom: 10px; padding: 0; }
+
+/* Fits the panel from about 1230px wide; narrower screens scroll the table inside its box */
+.review-table { min-width: 800px; }
+.review-table .rv-film { min-width: 110px; }
+.review-table .rv-name { min-width: 104px; overflow-wrap: anywhere; }   /* names stay readable instead of one word per line */
+.review-table .rv-cell { min-width: 220px; max-width: 420px; }
+.rv-text { color: var(--text-soft); white-space: pre-line; overflow-wrap: anywhere; }
+.rv-text.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.review-table tr.is-hidden td:not(:last-child):not(:nth-last-child(2)) { opacity: .55; }
+.actions-cell .link-btn + .link-btn { margin-left: 8px; }
+
+/* ---------- Messages ---------- */
+.message-list { display: grid; gap: 12px; }
+.message-list .panel + .panel { margin-top: 0; }
+.message { display: grid; gap: 10px; }
+.message.unread { border-color: rgba(var(--gold-rgb), .45); }
+.message-head, .message-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; }
+.message-head strong { font-weight: 600; }
+/* Name and email: a gap, not a margin, so an email that wraps under the name starts flush left */
+.message-head > div:first-child { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 8px; min-width: 0; }
+.message-head a, .message-head .muted { color: var(--muted); font-size: var(--fs-small); overflow-wrap: anywhere; }   /* .muted: an email that can't be a safe mailto link */
+.message-head a:hover { color: var(--text); }
+.message p { color: var(--text-soft); font-size: var(--fs-ui); white-space: pre-wrap; overflow-wrap: anywhere; }
+.message-foot small { font-size: var(--fs-label); font-weight: 500; }
+.message-foot span { display: flex; gap: 6px 14px; flex-wrap: wrap; }
+
+/* ---------- Settings ---------- */
+.settings-actions { display: grid; gap: 10px; justify-items: start; }
+/* Long labels wrap on narrow phones instead of running past the panel */
+.settings-actions .btn { max-width: 100%; white-space: normal; text-align: left; }
+.file-btn { position: relative; cursor: pointer; }
+.file-btn:focus-within { outline: 2px solid var(--gold); outline-offset: 3px; }
+.restore-msg { margin-top: 12px; color: var(--danger); font-weight: 600; font-size: var(--fs-small); }
+.restore-msg:empty { display: none; }
+.restore-msg.is-info { color: var(--muted); }
+.about-list { display: grid; gap: 10px; padding-left: 18px; color: var(--text-soft); font-size: var(--fs-small); line-height: 1.6; }
+.about-list li::marker { color: var(--muted); }
+
+/* ---------- Film dialog ---------- */
+/* The one raised surface: a dialog keeps its shadow */
+.admin-dialog {
+  width: min(760px, calc(100% - 24px)); max-height: calc(100svh - 24px); margin: auto; padding: 0;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-lg); background: var(--surface); color: var(--text); box-shadow: var(--shadow);
+}
+.admin-dialog::backdrop { background: rgba(0, 0, 0, .72); }
+.admin-dialog[open] { overflow: hidden; }
+.admin-dialog form { display: flex; flex-direction: column; max-height: calc(100svh - 26px); }
+.dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 24px; border-bottom: 1px solid var(--border); }
+.dialog-head h2 { font-size: 1.25rem; letter-spacing: -0.02em; }
+.dialog-body { padding: 20px 24px; overflow-y: auto; display: grid; gap: 16px; }
+.dialog-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 16px 24px; border-top: 1px solid var(--border); }
+.dialog-preview { margin-right: auto; width: 44px; }
+.dialog-preview .poster { padding: 0; border-radius: var(--radius-sm); }
+.form-row.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+input[type="color"] { padding: 4px; height: 48px; cursor: pointer; }
+/* Red only once the person has touched the field (or tried to submit), never on first load */
+input[aria-invalid="true"]:not(:focus) { border-color: var(--danger); }
+input:user-invalid:not(:focus) { border-color: var(--danger); }   /* own rule: older browsers drop a list with an unknown selector */
+
+/* ---------- Responsive ---------- */
+/* Below 1221px the day-wise table and the 300px summary can't share a row without the table scrolling
+   (and hiding its remove buttons), so the summary moves under the editor */
+@media (max-width: 1220px) {
+  .co-layout { grid-template-columns: minmax(0, 1fr); }
+  .co-summary { position: static; min-width: 0; max-height: none; overflow: visible; }
+}
+@media (max-width: 1100px) {
+  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-cols { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 820px) {
+  .admin-app { grid-template-columns: minmax(0, 1fr); }
+  /* The sidebar becomes a solid strip of text-only pill tabs (all six fit at 768px; phones swipe it sideways).
+     No scrollbar: the tab cut off at the edge shows there's more, and go() keeps the current tab in view. */
+  .admin-side {
+    position: sticky; top: 0; z-index: 40; height: auto; flex-direction: row; align-items: center; gap: 12px;
+    padding: 10px 12px; overflow-x: auto; scrollbar-width: none; border-right: 0; border-bottom: 1px solid var(--border);
+  }
+  .admin-side::-webkit-scrollbar { display: none; }
+  .admin-side .logo { display: none; }
+  .admin-nav { display: flex; gap: 4px; }
+  .admin-nav button { white-space: nowrap; width: auto; }
+  .admin-nav button svg.lucide { display: none; }
+  .admin-side-foot { display: none; }
+  .mobile-only { display: grid; }
+  .admin-main { padding: 0 16px 48px; }
+  .admin-top { height: 72px; }
+  .theme-menu { position: fixed; left: 16px; right: 16px; top: 140px; width: auto; }
+}
+@media (max-width: 560px) {
+  .admin-top h1 { font-size: var(--fs-h3); }
+  .stat-grid { gap: 10px; }
+  .stat { padding: 14px; gap: 10px; flex-direction: column; align-items: flex-start; }
+  .stat-icon { width: 36px; height: 36px; }
+  .stat small { letter-spacing: .06em; }
+  /* Shrinks with the screen so "₹4,945.32 Cr" stays inside a half-width tile at 360px */
+  .stat strong { font-size: clamp(1rem, 0.4rem + 3vw, 1.25rem); }
+  .admin-film { grid-template-columns: 52px minmax(0, 1fr); gap: 14px; align-items: start; }
+  .admin-film-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  .form-row.three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* A half-width date box cuts its "dd-mm-yyyy" short: the release date takes the row, note and year share the next */
+  .form-row.three > .field:has(> input[type="date"]) { grid-column: 1 / -1; }
+  .bar-row { grid-template-columns: minmax(0, 1fr) minmax(6.5em, auto); gap: 8px 12px; }
+  .bar-track { grid-column: 1 / -1; grid-row: 2; }
+  .editor-bar-actions { width: 100%; }
+  .editor-bar-actions .save-state { flex: 1 0 100%; }
+  .login-card { padding: 28px 20px; }
+  .dialog-head, .dialog-body, .dialog-foot { padding-left: 16px; padding-right: 16px; }
+  .critics-preview { grid-template-columns: 1fr 1fr; }
+  .review-head small { margin-left: 0; flex-basis: 100%; }
+  /* Language pills scroll sideways (bleeding to the screen edge) instead of stacking four rows deep.
+     The 6px of padding keeps the focus ring inside the scroller. */
+  .filter-chips {
+    flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none;
+    margin: -6px -16px; padding: 6px 16px; scroll-padding-inline: 16px;
+  }
+  .filter-chips::-webkit-scrollbar { display: none; }
+  .filter-chips .chip { flex: 0 0 auto; }
+  .picker-group { width: 100%; }
+  .picker-group > .field { flex: 1 1 100%; }
+  /* "Malayalam" and "10 day-wise" still fit a third of a 360px screen */
+  .lang-tiles { gap: 6px; }
+  .lang-tile { padding: 10px 8px; }
+  .lang-tile span { font-size: .8125rem; }
+}
