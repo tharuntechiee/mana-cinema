@@ -139,7 +139,7 @@ const trackedFilms = releasedFilms.filter(m => { const f = filmFacts(m); return 
 const countText = n => n.toLocaleString("en-IN");
 
 // ---------- Cover: the star ring ----------
-// Pawan Kalyan in the centre (the drawn OG artwork, in a red ring), heroes from every language packed closely
+// Pawan Kalyan in the centre (his photo, in a red ring), heroes from every language packed closely
 // on two rings around him (js/cover-stars.js). Every star links to the box-office lists for his language.
 // From 1024px up the stars sit on two ellipses worked out below from the middle circle's size and the
 // screen's height; narrower screens lay them out in CSS (a wrapping grid on tablets, one sideways-scrolling
@@ -175,17 +175,20 @@ function starHTML(s, i) {
     </a>`;
 }
 
-// The centre: the site's own They Call Him OG artwork (js/art.js), no photo and no text, in a red ring.
-// It opens the OG film page (or his language's lists if that film has been removed); the link's label
-// says so.
+// The centre: his photo only (no text), in a red ring; without a photo, the site's own They Call Him OG
+// drawing (js/art.js). It opens the OG film page (or his language's lists if that film has been removed);
+// the link's label says so.
 const OG_FILM_ID = 10;
 function leadHTML(s) {
   const og = getMovie(OG_FILM_ID);
   const href = og ? `film.html?id=${OG_FILM_ID}` : listsLink(s);
   const label = og ? `${s.name} in ${og.title}: box office` : `${s.name}: ${s.lang} box office lists`;
+  const picture = s.img
+    ? `<span class="star-photo"><img src="${esc(s.img)}" width="400" height="400" alt="${esc(s.name)}" decoding="async" loading="eager" fetchpriority="high"></span>`
+    : `<span class="star-photo star-art">${heroArt({ art: "og" }, "star-art-svg", "xMidYMid")}</span>`;
   return `
     <a class="star star-lead star-og" href="${href}" aria-label="${esc(label)}" style="--i:0">
-      <span class="star-photo star-art">${heroArt({ art: "og" }, "star-art-svg", "xMidYMid")}</span>
+      ${picture}
     </a>`;
 }
 

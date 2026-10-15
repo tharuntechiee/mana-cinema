@@ -1,9 +1,9 @@
 // Stars on the home page cover: Pawan Kalyan in the centre, heroes from every language around him.
 // Photos are free-licensed files from Wikimedia Commons, cropped to circles (images/heroes/).
 // Each licence requires a credit: the footer lists author, licence and source for every photo.
-// The centre shows the site's own They Call Him OG drawing, not a photo, so his entry has no photo or credit.
+// A star without a photo (no img) gets no credit; in the centre he would show the site's own OG drawing instead.
 const COVER_STARS = [
-  {slug: "pawan-kalyan",name: "Pawan Kalyan",lang: "Telugu"},
+  {slug: "pawan-kalyan",name: "Pawan Kalyan",lang: "Telugu",author: "Lalith10",licence: "CC BY-SA 3.0",source: "https://commons.wikimedia.org/wiki/File:Pawan2.jpg",licenceUrl: "https://creativecommons.org/licenses/by-sa/3.0/",img: "images/heroes/pawan-kalyan-2007.jpg"},
   {slug: "allu-arjun",name: "Allu Arjun",lang: "Telugu",author: "Bollywood Hungama",licence: "CC BY 3.0",source: "https://commons.wikimedia.org/wiki/File:Allu_Arjun_at_Pushpa_2_The_Rule_meet.jpg",licenceUrl: "https://creativecommons.org/licenses/by/3.0/",img: "images/heroes/allu-arjun.jpg"},
   {slug: "jr-ntr",name: "Jr NTR",lang: "Telugu",author: "Silverscreen Media",licence: "CC BY-SA 3.0",source: "https://commons.wikimedia.org/wiki/File:N._T._Rama_Rao_Jr._in_2021.jpg",licenceUrl: "https://creativecommons.org/licenses/by-sa/3.0/",img: "images/heroes/jr-ntr.jpg"},
   {slug: "prabhas",name: "Prabhas",lang: "Telugu",author: "Bollywood Hungama",licence: "CC BY 3.0",source: "https://commons.wikimedia.org/wiki/File:Prabhas_at_Saaho_Pre_release_event_(cropped).jpg",licenceUrl: "https://creativecommons.org/licenses/by/3.0/",img: "images/heroes/prabhas.jpg"},

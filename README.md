@@ -6,7 +6,7 @@ Box office collections, verdicts and ratings for Indian films in nine languages:
 
 ## What's inside
 
-- **Stars cover:** the MANA CINEMA title with Pawan Kalyan in the centre (our own drawn They Call Him OG artwork, in a red ring) and 21 heroes from all nine languages around him. Each hero opens their language's lists.
+- **Stars cover:** the MANA CINEMA title with Pawan Kalyan in the centre (in a red ring, opening the They Call Him OG page) and 21 heroes from all nine languages around him. Each hero opens their language's lists.
 - **New this week:** this week's releases in every language, with release status, first critics' scores and Day 1 figures as they are reported.
 - **Box office leaderboard:** rank films by opening day, opening weekend, first 7 days, lifetime India net, worldwide gross or rating. Filter by language and year, and include or leave out paid previews.
 - **Lists** (`lists.html`): for every language, the all-time top grossers (top 25 for Hindi, Telugu, Tamil, Malayalam and Kannada; top 10 for Marathi, Bengali, Punjabi and Gujarati) and the biggest opening days.
@@ -56,4 +56,4 @@ images/           Poster photos (see images/README.txt)
 
 ## Credits
 
-Poster and hero photos are free-licensed files from Wikimedia Commons, cropped to circles (the centre of the cover is a drawing, not a photo); every photo is credited in the Photo credits section on the home page. Visual style inspired by District's movie app; this project is not affiliated with District or Zomato. Synopses are our own short summaries.
+Poster and hero photos are free-licensed files from Wikimedia Commons, cropped to circles; every photo is credited in the Photo credits section on the home page. Visual style inspired by District's movie app; this project is not affiliated with District or Zomato. Synopses are our own short summaries.
