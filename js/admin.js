@@ -598,7 +598,7 @@ function filmCardHTML(m) {
     <article class="admin-film">
       ${posterHTML(m, { compact: true })}
       <div class="admin-film-info">
-        <h3>${esc(m.title)} ${m.cover ? `<span class="chip chip-accent">Cover</span>` : ""}</h3>
+        <h3>${esc(m.title)}</h3>
         <p class="meta">${meta}</p>
         <p class="meta film-status">${statusChip(m)} ${verdictHTML(m)} <span>${facts}</span></p>
       </div>
@@ -671,7 +671,6 @@ function openFilm(id = null) {
   set("fImage", m.image);
   $("fColor1").value = /^#[0-9a-f]{6}$/i.test(m.colors?.[0] || "") ? m.colors[0] : DEFAULT_COLORS[0];
   $("fColor2").value = /^#[0-9a-f]{6}$/i.test(m.colors?.[1] || "") ? m.colors[1] : DEFAULT_COLORS[1];
-  $("fCover").checked = Boolean(m.cover);
   syncFilmForm();
   filmSnapshot = JSON.stringify(formFilm());
   $("filmDialog").showModal();
@@ -709,7 +708,7 @@ function formFilm() {
     status: !release && $("fReleased").checked ? "released" : "",
     year: release ? parseDay(release)?.getFullYear() : Number(v("fYear")) || undefined,
     duration: v("fDuration"), cert: $("fCert").value, director: v("fDirector"), cast: v("fCast"), desc: v("fDesc"),
-    art: $("fArt").value, colors: [$("fColor1").value, $("fColor2").value], image: v("fImage"), cover: $("fCover").checked,
+    art: $("fArt").value, colors: [$("fColor1").value, $("fColor2").value], image: v("fImage"),
   };
 }
 
@@ -760,18 +759,17 @@ $("filmForm").addEventListener("submit", e => {
   e.preventDefault();
   let movies = db.movies();
   const data = formFilm();
-  if (data.cover) movies = movies.map(x => ({ ...x, cover: false }));  // only one cover film
   let film;
   if (editingId !== null) {
     const old = findFilm(movies, editingId);
     if (!old) { $("filmDialog").close(); toast("That film was deleted."); renderFilms(); return $("addFilm").focus(); }
-    film = { ...old, ...data, id: editingId };   // critics and boxOffice stay as they are
+    // critics and boxOffice stay as they are, and so do fields the form no longer edits (an old "cover" flag)
+    film = { ...old, ...data, id: editingId };
   } else {
     film = { ...data, id: Math.max(FIRST_ADMIN_ID - 1, ...movies.map(x => x.id)) + 1, critics: {}, boxOffice: {} };
   }
   // Empty optional fields are removed, not saved as ""
   ["release", "releaseNote", "status", "year", "duration", "cert", "director", "cast", "image", "art"].forEach(k => { if (blank(film[k])) delete film[k]; });
-  if (!film.cover) delete film.cover;
   movies = editingId !== null ? movies.map(x => (x.id === editingId ? film : x)) : [...movies, film];
   if (!saveStore(MOVIES_KEY, movies)) return toast(SAVE_FAILED);
   $("filmDialog").close();

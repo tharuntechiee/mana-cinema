@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=3">
+  <link rel="stylesheet" href="css/style.css?v=5">
 </head>
 <body>
   <a href="#main" class="skip-link">Skip to content</a>
@@ -31,34 +31,21 @@
     </div>
   </nav>
 
-  <!-- Cover page: the cover film (They Call Him OG). Tags, lead, credits and figures come from js/data.js -->
+  <!-- Cover: the title, then the star ring. Pawan Kalyan in the centre (linking to They Call Him OG), heroes
+       from every language on two rings around him (js/cover-stars.js, drawn and placed by js/main.js).
+       Each of the other stars links to his language's lists. -->
   <section class="cover" id="cover" aria-labelledby="coverTitle">
-    <div class="cover-art" aria-hidden="true">
-      <span class="cover-smoke"></span>
-      <span class="cover-hero" id="coverHero"></span>
-      <span class="cover-photo"></span>
-      <span class="cover-og" id="coverOg">OG</span>
-      <span class="cover-slash"></span>
-      <span class="cover-grain"></span>
-    </div>
-    <div class="container cover-content">
-      <h1 id="coverTitle">
-        <span class="cover-pre" id="coverPre">They call him</span>
-        <span class="cover-name" id="coverName">OG</span>
-      </h1>
-      <div class="cover-facts" id="coverMeta">
-        <p class="pipe-line hero-line"><span><span class="sr-only">Certificate </span>A</span><span>Telugu</span><span>2h 34m</span><span><span class="sr-only">Released </span>25 Sep 2025</span></p>
-        <ul class="genre-pills" aria-label="Genre"><li class="tag">Action</li><li class="tag">Gangster Drama</li></ul>
+    <div class="cover-inner">
+      <div class="cover-head">
+        <h1 id="coverTitle">MANA CINEMA</h1>
+        <p class="cover-tagline">Indian box office · every language</p>
       </div>
-      <p class="cover-lead" id="coverLead">A feared gangster returns to Bombay after a decade away, and the city still remembers his name.</p>
-      <p class="credits cover-credits" id="coverCredits"><span>Director</span> Sujeeth <span>Starring</span> Pawan Kalyan, Emraan Hashmi, Priyanka Arul Mohan</p>
-      <div id="coverStats" hidden></div>
-      <div class="hero-actions">
-        <a href="film.html?id=10" class="btn btn-primary cover-btn" id="coverCta">Collections &amp; ratings</a>
-        <a href="#box-office" class="btn btn-ghost">Leaderboard</a>
+      <div class="star-stage" id="starStage"></div>
+      <div class="hero-actions cover-actions">
+        <a href="#box-office" class="btn btn-primary">Box office leaderboard</a>
+        <a href="lists.html" class="btn btn-ghost">Language lists</a>
       </div>
     </div>
-    <a href="#home" class="cover-scroll" aria-label="Scroll to featured films"><i data-lucide="chevron-down"></i></a>
   </section>
 
   <!-- Featured films: the biggest Telugu worldwide grossers (the rest of India is on the leaderboard and in Lists) -->
@@ -80,6 +67,19 @@
     <div class="container">
       <ul class="pulse-strip reveal" id="pulse" aria-label="Box office at a glance"></ul>
     </div>
+
+    <!-- Films releasing this week (Monday to Sunday): out today, out now, or the day they release -->
+    <section id="new-this-week" class="new-week" aria-labelledby="newWeekTitle">
+      <div class="container">
+        <div class="section-head reveal">
+          <div>
+            <h2 id="newWeekTitle">New this week</h2>
+            <p class="section-intro" id="newWeekRange"></p>
+          </div>
+        </div>
+        <div class="week-grid reveal" id="newWeekGrid"></div>
+      </div>
+    </section>
 
     <section id="box-office" aria-labelledby="boardTitle">
       <div class="container">
@@ -237,6 +237,28 @@
         </div>
       </div>
     </section>
+
+    <!-- Photo credits: every photo on the site (the licences ask for author, licence and source).
+         The star photos are listed from js/cover-stars.js; the poster photos are listed here. -->
+    <section id="credits" class="photo-credits" aria-label="Photo credits">
+      <div class="container">
+        <details id="creditsBox">
+          <summary><span id="creditsSummary">Photo credits</span></summary>
+          <div class="credits-body">
+            <p class="fine-print">Free-licensed photos from Wikimedia Commons, credited as their licences ask.</p>
+            <p class="credits-head" id="starCreditsHead">Star photos</p>
+            <ul class="credit-list" id="starCredits" aria-labelledby="starCreditsHead"></ul>
+            <p class="credits-head" id="posterCreditsHead">Poster photos</p>
+            <ul class="credit-list" id="posterCredits" aria-labelledby="posterCreditsHead">
+              <li><a href="https://commons.wikimedia.org/wiki/File:The_portrait_of_Pawan_Kalyan_(2024).jpg" target="_blank" rel="noopener">Pawan Kalyan</a> (PMO/PIB, GODL-India)</li>
+              <li><a href="https://commons.wikimedia.org/wiki/File:Prabhas_and_Deepika_Padukone_at_launch_event_in_Mumbai.jpg" target="_blank" rel="noopener">Prabhas &amp; Deepika Padukone</a> (Bollywood Hungama, CC BY 3.0)</li>
+              <li><a href="https://commons.wikimedia.org/wiki/File:Allu_Arjun_at_Pushpa_2_The_Rule_meet.jpg" target="_blank" rel="noopener">Allu Arjun</a> (Bollywood Hungama, CC BY 3.0)</li>
+              <li><a href="https://commons.wikimedia.org/wiki/File:N._T._Rama_Rao_Jr._in_2021.jpg" target="_blank" rel="noopener">N. T. Rama Rao Jr.</a> (Silverscreen Media, CC BY-SA 3.0)</li>
+            </ul>
+          </div>
+        </details>
+      </div>
+    </section>
   </main>
 
   <footer class="site-footer">
@@ -264,17 +286,18 @@
       </div>
       <div class="footer-bottom">
         <span>&copy; 2026 MANA CINEMA. All rights reserved.</span>
-        <span>A project-based design · Photos via Wikimedia Commons: <a href="https://commons.wikimedia.org/wiki/File:The_portrait_of_Pawan_Kalyan_(2024).jpg" target="_blank" rel="noopener">Pawan Kalyan</a> (PMO/PIB, GODL-India) · <a href="https://commons.wikimedia.org/wiki/File:Prabhas_and_Deepika_Padukone_at_launch_event_in_Mumbai.jpg" target="_blank" rel="noopener">Prabhas &amp; Deepika Padukone</a> (Bollywood Hungama, CC BY 3.0) · <a href="https://commons.wikimedia.org/wiki/File:Allu_Arjun_at_Pushpa_2_The_Rule_meet.jpg" target="_blank" rel="noopener">Allu Arjun</a> (Bollywood Hungama, CC BY 3.0) · <a href="https://commons.wikimedia.org/wiki/File:N._T._Rama_Rao_Jr._in_2021.jpg" target="_blank" rel="noopener">N. T. Rama Rao Jr.</a> (Silverscreen Media, CC BY-SA 3.0)</span>
+        <span>A project-based design · <a href="#credits">Photos via Wikimedia Commons — see photo credits</a></span>
       </div>
     </div>
   </footer>
 
-  <script src="js/films-india.js?v=3"></script>
-  <script src="js/data.js?v=3"></script>
-  <script src="js/art.js?v=3"></script>
+  <script src="js/films-india.js?v=4"></script>
+  <script src="js/data.js?v=4"></script>
+  <script src="js/art.js?v=4"></script>
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" integrity="sha384-ieG+IKD0d/ZPXyCBTMVAbqsQdns8QGJR/e26WMw7M4fkaI/rHcS/YIoi+ah9WGge" crossorigin="anonymous"></script>
-  <script src="js/ui.js?v=3"></script>
-  <script src="js/boxoffice.js?v=3"></script>
-  <script src="js/main.js?v=3"></script>
+  <script src="js/ui.js?v=4"></script>
+  <script src="js/boxoffice.js?v=4"></script>
+  <script src="js/cover-stars.js?v=4"></script>
+  <script src="js/main.js?v=4"></script>
 </body>
 </html>

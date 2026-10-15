@@ -1,5 +1,6 @@
-// Home page: cover, featured Telugu films, box-office pulse, all-India leaderboard, films, coming soon,
-// how we track, feedback. Every figure comes from js/boxoffice.js; this file only arranges it on the page.
+// Home page: cover (title and star ring), featured Telugu films, box-office pulse, new this week,
+// all-India leaderboard, films, coming soon, how we track, feedback, photo credits.
+// Every figure comes from js/boxoffice.js; this file only arranges it on the page.
 
 // ---------- Helpers ----------
 const $ = id => document.getElementById(id);
@@ -87,10 +88,10 @@ function heroFactsHTML(m) {
   return facts + pills;
 }
 
-// Headline figures. A figure that isn't reported is left out, never shown as 0.
-// The cover uses IMDb only; the carousel falls back to the critics' average.
-function statsHTML(m, { critics = false } = {}) {
-  const od = openingDay(m), ww = worldwideGross(m), imdb = imdbScore(m), cs = critics && !imdb ? criticsScore(m) : null;
+// Headline figures on a carousel slide. A figure that isn't reported is left out, never shown as 0.
+// The rating is IMDb's, else the critics' average.
+function statsHTML(m) {
+  const od = openingDay(m), ww = worldwideGross(m), imdb = imdbScore(m), cs = imdb ? null : criticsScore(m);
   const items = [
     od !== null && ["Opening day", `<span class="money">${crore(od)}</span>${openingHasPreviews(m) ? "<small>incl. previews</small>" : ""}`],
     ww !== null && ["Worldwide gross", `<span class="money">${crore(ww)}</span>`],
@@ -133,43 +134,240 @@ function revealPressed(group) {
   group.scrollBy({ left: c.left - g.left - (g.width - c.width) / 2, behavior: smooth ? "smooth" : "auto" });
 }
 
-// ---------- Cover ----------
-// The static text in index.html stays as the fallback when no film is marked as the cover.
-const coverMovie = MOVIES.find(m => m.cover);
-if (coverMovie) {
-  $("coverHero").innerHTML = heroArt(coverMovie, "cover-hero-art");
-  // Wide cover photo: add  coverImage: "images/cover/og-cover.jpg"  to the cover film in data.js
-  const photo = posterImage({ image: coverMovie.coverImage });
-  if (photo) {
-    $("cover").style.setProperty("--cover-photo", `url('${photo}')`);
-    $("coverHero").hidden = true;
+// Released films with at least one reported figure ("How we track" counts these)
+const trackedFilms = releasedFilms.filter(m => { const f = filmFacts(m); return f.ww !== null || f.net !== null || f.opening !== null; });
+const countText = n => n.toLocaleString("en-IN");
+
+// ---------- Cover: the star ring ----------
+// Pawan Kalyan in the centre, heroes from every language on two rings around him (js/cover-stars.js).
+// The centre star is styled after They Call Him OG and links to its film page, with its tag and figures
+// under his name; every other star links to the box-office lists for his language.
+// From 1024px up the stars sit on two ellipses worked out below from the stage's width and the screen's
+// height; narrower screens lay them out in CSS (a wrapping grid on tablets, one sideways-scrolling row on phones).
+const STAR_LEAD = "pawan-kalyan";
+const LEAD_FILM_ID = 10;   // They Call Him OG
+const leadFilm = getMovie(LEAD_FILM_ID);
+// Clockwise from the top. The outer ring starts half a step on, so its stars sit between the inner ones.
+const STAR_RINGS = [
+  ["prabhas", "allu-arjun", "jr-ntr", "ram-charan", "shah-rukh-khan", "rajinikanth", "mohanlal", "yash", "vijay"],
+  ["mahesh-babu", "chiranjeevi", "salman-khan", "aamir-khan", "ranveer-singh", "mammootty", "rishab-shetty",
+    "riteish-deshmukh", "dev", "prosenjit-chatterjee", "diljit-dosanjh", "malhar-thakar"],
+];
+const coverStars = typeof COVER_STARS !== "undefined" && Array.isArray(COVER_STARS) ? COVER_STARS : [];
+const starLead = coverStars.find(s => s.slug === STAR_LEAD) || coverStars[0];
+const starRings = (() => {
+  const bySlug = new Map(coverStars.map(s => [s.slug, s]));
+  const rings = STAR_RINGS.map(ring => ring.map(slug => bySlug.get(slug)).filter(Boolean));
+  // A star added to js/cover-stars.js but not to a ring above joins the outer ring
+  const placed = new Set([starLead, ...rings.flat()]);
+  rings[1].push(...coverStars.filter(s => !placed.has(s)));
+  return rings;
+})();
+const starStage = $("starStage");
+
+// One star: the photo in a circle, the name under it, then the language (shown in the grid and the
+// phone row; on the rings it appears on hover). The link's name says where it goes.
+const listsLink = s => `lists.html?lang=${esc(encodeURIComponent(s.lang))}`;
+function starHTML(s, i) {
+  return `
+    <a class="star" href="${listsLink(s)}" aria-label="${esc(`${s.name}: ${s.lang} box office lists`)}" style="--i:${i}">
+      <span class="star-photo"><img src="${esc(s.img)}" width="360" height="360" alt="${esc(s.name)}" decoding="async" loading="lazy"></span>
+      <span class="star-name">${esc(s.name)}</span>
+      <span class="star-lang">${esc(s.lang)}</span>
+    </a>`;
+}
+
+// "₹295.22 Cr worldwide · Hit": the OG film's worldwide gross and verdict, leaving out whichever isn't in
+function leadFigures(m) {
+  const ww = worldwideGross(m), v = verdict(m);
+  return [
+    ww !== null && `${crore(ww)} worldwide`,
+    v && `${v.running ? "Trending: " : ""}${v.label}${v.indicative || v.running ? "*" : ""}`,
+  ].filter(Boolean).join(" · ");
+}
+
+// The centre star: his photo in a red ring, his name, then the film's tag and figures. It links to the
+// film's page; without the film (an admin removed it) it links to his language's lists like the others.
+function leadHTML(s) {
+  const m = leadFilm;
+  const figures = m ? leadFigures(m) : "";
+  return `
+    <a class="star star-lead${m ? " star-og" : ""}" href="${m ? filmURL(m) : listsLink(s)}" aria-label="${esc(m ? `${s.name}: ${m.title} box office` : `${s.name}: ${s.lang} box office lists`)}" style="--i:0">
+      <span class="star-photo"><img src="${esc(s.img)}" width="520" height="520" alt="${esc(s.name)}" decoding="async" loading="eager" fetchpriority="high"></span>
+      <span class="lead-caption">
+        <span class="star-name">${esc(s.name)}</span>
+        ${m ? `<span class="og-tag">${esc(m.title)}</span>` : ""}
+        ${figures ? `<span class="og-figures">${esc(figures)}</span>` : ""}
+      </span>
+    </a>`;
+}
+
+if (starLead) {
+  let n = 1;
+  starStage.innerHTML = `
+    ${leadHTML(starLead)}
+    <ul class="star-ring" role="list">
+      ${starRings.map((ring, r) => ring.map((s, k) => `<li class="ring-${r}" data-ring="${r}" data-k="${k}">${starHTML(s, n++)}</li>`).join("")).join("")}
+    </ul>`;
+} else {
+  starStage.hidden = true;
+}
+
+// The rings are ellipses around the middle circle. The outer ring is as wide as the stage allows (its
+// widest star just fits) and the inner ring is a share of it (see below). Their heights start in proportion to
+// their widths, squashed if need be so the title, the rings and the calls to action fit on the first
+// screen; then each half of a ring (above and below the middle) grows taller until no star comes within
+// STAR_GAP of another or of the middle star. The gap always wins over fitting the screen. A star counts
+// as the box around its circle and name, so names never touch either; the middle star counts as its
+// circle and the caption under it (name, film tag, figures). The halves are sized separately because the
+// caption and the names hang below the circles, so the rings need more room below the middle than above.
+// The stage then takes the height the rings need (8px spare above the top circle and below the lowest
+// name), with the middle circle at its horizontal centre.
+const ringMode = matchMedia("(min-width: 1024px)");
+// Inner ring width : outer (the usual share first, then others to try); height : width of each ring
+// before any squashing. The outer ring stays at least `orbit` times as tall as the inner one (above and
+// below), so it still reads as the outer orbit.
+const RING_SHAPE = { inner: [0.72, 0.76, 0.68, 0.8], innerTall: 0.68, outerTall: 0.6, orbit: 1.1 };
+const SQUASH_MIN = 0.3;   // the flattest the rings start, as a share of the heights above
+const STAR_GAP = 12;
+
+// Room for the stage on the first screen: the window less what sits above the stage (navbar, the cover's
+// top padding, the title) and the calls to action under it, with 12px to spare
+function stageBudget() {
+  const cover = $("cover"), head = cover.querySelector(".cover-head"), actions = cover.querySelector(".cover-actions");
+  const px = (el, prop) => parseFloat(getComputedStyle(el)[prop]) || 0;
+  const above = cover.offsetTop + px(cover, "paddingTop") + head.offsetHeight + px(head, "marginBottom");
+  const below = actions ? actions.offsetHeight + px(actions, "marginTop") : 0;
+  return innerHeight - above - below - 12;
+}
+
+function layoutStars() {
+  if (starStage.hidden) return;
+  if (!ringMode.matches) {
+    starStage.style.removeProperty("--stage-h");
+    starStage.style.removeProperty("--centre-y");
+    return;
   }
-  // The heading is set as "They call him / OG". Another cover film gets its own title, and the big
-  // "OG" letters behind it go, so the cover never pairs one film's heading with another's figures.
-  const nick = /^they call him\s+(.+)$/i.exec(coverMovie.title || "");
-  if (nick) {
-    $("coverName").textContent = nick[1];
-  } else {
-    $("coverPre").hidden = true;
-    $("coverOg").hidden = true;
-    $("coverName").textContent = coverMovie.title;
-    $("coverName").classList.add("cover-name-long");
+  const half = starStage.clientWidth / 2 - 4;   // stars stay 4px inside the stage
+  const lead = starStage.querySelector(".star-lead");
+  const leadD = lead.querySelector(".star-photo").offsetWidth;
+  const caption = lead.querySelector(".lead-caption");
+  // Boxes are measured from the centre of the middle circle: the circle, then the caption under it
+  const fixed = [
+    { x0: -leadD / 2, x1: leadD / 2, y0: -leadD / 2, y1: leadD / 2 },
+    { x0: -caption.offsetWidth / 2, x1: caption.offsetWidth / 2, y0: caption.offsetTop - leadD / 2, y1: caption.offsetTop + caption.offsetHeight - leadD / 2 },
+  ];
+  const stars = [...starStage.querySelectorAll(".star-ring > li")].map(li => {
+    const ring = Number(li.dataset.ring);
+    const step = 2 * Math.PI / starRings[ring].length;
+    const angle = (Number(li.dataset.k) + (ring ? 0.5 : 0)) * step;   // clockwise from the top
+    return {
+      li, ring, angle,
+      side: Math.cos(angle) > 1e-6 ? 0 : 1,   // 0: above the middle, 1: level with it or below
+      d: li.querySelector(".star-photo").offsetWidth,
+      w: li.offsetWidth,
+      h: li.offsetHeight,   // from the top of the circle to the bottom of the name
+    };
+  });
+  const fit = list => Math.min(half - 40, ...list.map(s => (half - s.w / 2) / Math.max(Math.abs(Math.sin(s.angle)), 0.2)));
+  const outerX = fit(stars.filter(s => s.ring === 1));
+  const innerMax = fit(stars.filter(s => s.ring === 0));
+  const near = (p, q) => Math.min(p.x1, q.x1) - Math.max(p.x0, q.x0) > -STAR_GAP && Math.min(p.y1, q.y1) - Math.max(p.y0, q.y0) > -STAR_GAP;
+
+  // The rings for one inner share and squash factor: ry[ring][side] starts from the proportions above,
+  // then grows
+  function place(share, squash) {
+    const rx = [Math.min(outerX * share, innerMax), outerX];
+    const ry = [rx[0] * RING_SHAPE.innerTall * squash, rx[1] * RING_SHAPE.outerTall * squash].map(v => [v, v]);
+    const keepOrbit = () => ry[1].forEach((v, side) => { ry[1][side] = Math.max(v, ry[0][side] * RING_SHAPE.orbit); });
+    const boxOf = s => {
+      const x = Math.sin(s.angle) * rx[s.ring], y = -Math.cos(s.angle) * ry[s.ring][s.side];
+      return { x, y, x0: x - s.w / 2, x1: x + s.w / 2, y0: y - s.d / 2, y1: y - s.d / 2 + s.h };
+    };
+    keepOrbit();
+    let boxes = stars.map(boxOf);
+    for (let tries = 0; tries < 400; tries++) {
+      // A clash involving an outer star moves that side of the outer ring out; one between inner stars (or
+      // with the middle star) moves that side of the inner ring out, which may in turn push the outer ring
+      const grow = [[false, false], [false, false]];
+      let clashed = false;
+      boxes.forEach((p, i) => {
+        const clash = (other, b = null) => {
+          if (!near(p, other)) return;
+          clashed = true;
+          const pair = [stars[i], b].filter(Boolean);
+          const outer = pair.filter(s => s.ring === 1);
+          (outer.length ? outer : pair).forEach(s => { grow[s.ring][s.side] = true; });
+        };
+        fixed.forEach(f => clash(f));
+        for (let j = i + 1; j < boxes.length; j++) clash(boxes[j], stars[j]);
+      });
+      if (!clashed) break;
+      grow.forEach((sides, r) => sides.forEach((on, side) => { if (on) ry[r][side] *= 1.01; }));
+      keepOrbit();
+      boxes = stars.map(boxOf);
+    }
+    const all = [...fixed, ...boxes];
+    const above = Math.ceil(Math.max(...all.map(b => -b.y0)) + 8);
+    const below = Math.ceil(Math.max(...all.map(b => b.y1)) + 8);
+    return { boxes, above, height: above + below };
   }
-  $("coverMeta").innerHTML = heroFactsHTML(coverMovie);
-  $("coverLead").textContent = coverMovie.desc || "";
-  $("coverLead").hidden = !coverMovie.desc;
-  const credits = creditsHTML(coverMovie);
-  $("coverCredits").outerHTML = credits.replace('class="credits"', 'class="credits cover-credits"');
-  $("coverStats").outerHTML = statsHTML(coverMovie);
-  $("coverCta").href = filmURL(coverMovie);
-  // An upcoming cover film has no figures yet, so the button doesn't promise them
-  if (!isReleased(coverMovie)) $("coverCta").textContent = "Film details";
+
+  // The inner ring's share: the first that lets the rings fit the first screen, else whichever packs them
+  // flattest. (On a narrower stage the inner ring's bottom stars must spread wider to clear the caption,
+  // or they drop below it and push the outer ring down too.)
+  const budget = stageBudget();
+  const flattest = RING_SHAPE.inner.map(share => ({ share, ...place(share, SQUASH_MIN) }));
+  const pick = flattest.find(f => f.height <= budget) || flattest.reduce((a, b) => (b.height < a.height ? b : a));
+  // Then the roundest rings that fit: the natural shape if it fits, else the least squash that does
+  // (found by halving), else the flattest
+  let best = place(pick.share, 1);
+  if (best.height > budget) {
+    let lo = SQUASH_MIN, hi = 1;
+    best = pick;
+    if (best.height <= budget) {
+      for (let k = 0; k < 8; k++) {
+        const mid = (lo + hi) / 2, tried = place(pick.share, mid);
+        if (tried.height <= budget) { lo = mid; best = tried; } else hi = mid;
+      }
+    }
+  }
+  starStage.style.setProperty("--stage-h", `${best.height}px`);
+  starStage.style.setProperty("--centre-y", `${best.above}px`);
+  stars.forEach((s, i) => {
+    s.li.style.setProperty("--x", `${best.boxes[i].x.toFixed(1)}px`);
+    s.li.style.setProperty("--y", `${best.boxes[i].y.toFixed(1)}px`);
+  });
+}
+
+if (!starStage.hidden) {
+  layoutStars();
+  // Only a change of the stage's width, the circle sizes (CSS picks them by screen width and height) or
+  // the window's height moves the stars. The title block and the middle circle are watched, not the
+  // stage, so the stage's own new height can't loop back here.
+  const leadPhoto = starStage.querySelector(".star-lead .star-photo");
+  const sizeKey = () => `${starStage.clientWidth}:${leadPhoto.offsetWidth}:${innerHeight}`;
+  let lastKey = sizeKey();
+  const relayout = () => {
+    if (sizeKey() === lastKey) return;
+    lastKey = sizeKey();
+    layoutStars();
+  };
+  const ruler = document.querySelector(".cover-head");
+  if ("ResizeObserver" in window && ruler) {
+    const watch = new ResizeObserver(relayout);
+    watch.observe(ruler);
+    watch.observe(leadPhoto);
+  }
+  addEventListener("resize", relayout);
+  ringMode.addEventListener("change", layoutStars);
+  document.fonts?.ready.then(layoutStars);   // the names are measured: measure again in the web font
 }
 
 // ---------- Featured carousel ----------
-// Telugu stays in the spotlight: the three biggest Telugu worldwide grossers, leaving out the cover
-// film (it already has the cover). Their rank among Telugu films goes on each slide.
-const teluguRanks = ranking(MOVIES.filter(m => m.lang === "Telugu"), "worldwide").filter(r => !r.m.cover).slice(0, 3);
+// Telugu stays in the spotlight: the three biggest Telugu worldwide grossers.
+// Their rank among Telugu films goes on each slide.
+const teluguRanks = ranking(MOVIES.filter(m => m.lang === "Telugu"), "worldwide").slice(0, 3);
 const featured = teluguRanks.map(r => r.m);
 const featuredRank = new Map(teluguRanks.map(r => [r.m, r.rank]));
 const hero = $("home");
@@ -186,7 +384,7 @@ function slideHTML(m) {
     <h2 class="hero-title">${esc(m.title)}</h2>
     ${heroFactsHTML(m)}
     ${m.desc ? `<p class="lead">${esc(m.desc)}</p>` : creditsHTML(m)}
-    ${statsHTML(m, { critics: true })}
+    ${statsHTML(m)}
     <div class="hero-actions">
       <a href="${filmURL(m)}" class="btn btn-primary">Collections &amp; ratings<span class="sr-only">: ${esc(m.title)}</span></a>
       <a href="#films" class="btn btn-ghost">All films</a>
@@ -327,6 +525,70 @@ function pulseTile(m, icon, label, figure) {
   ].filter(Boolean);
   $("pulse").innerHTML = tiles.join("");
   $("pulse").hidden = !tiles.length;
+})();
+
+// ---------- New this week ----------
+// Every film releasing this week (Monday to Sunday), by release date; on the same day the bigger film
+// first (more critics' reviews, then the bigger worldwide gross), then by title.
+// Coming soon leaves these out, so no film shows in both.
+const weekStart = addDays(startOfToday(), -((startOfToday().getDay() + 6) % 7));   // this week's Monday
+const weekEnd = addDays(weekStart, 6);                                              // and Sunday
+const reviewCount = m => criticsScore(m)?.count || 0;
+const newThisWeek = MOVIES
+  .filter(m => { const d = parseDay(m.release); return d && d >= weekStart && d <= weekEnd; })
+  .sort((a, b) => releaseTime(a) - releaseTime(b) || reviewCount(b) - reviewCount(a)
+    || (filmFacts(b).ww ?? -1) - (filmFacts(a).ww ?? -1) || byTitle(a, b));
+const inNewThisWeek = new Set(newThisWeek);
+
+// "Out today", "Out now" (earlier this week) or "Releases Fri 16 Oct"
+function weekStatus(m) {
+  const n = daysUntil(m);
+  if (n === 0) return ["Out today", "is-today"];
+  if (n < 0) return ["Out now", "is-out"];
+  return [`Releases ${dayLabel(m.release, { weekday: true, year: false })}`, "is-soon"];
+}
+
+// The first number: the opening day once reported; until then, when it's due. Upcoming films show none.
+function weekFigure(m) {
+  const od = openingDay(m);
+  if (od !== null) return `<p class="week-figure"><span>Day 1</span> <strong class="money">${crore(od)}</strong>${openingHasPreviews(m) ? " <small>incl. previews</small>" : ""}</p>`;
+  if (!isReleased(m)) return "";
+  const n = daysUntil(m);
+  const note = n === 0 ? "Day 1 figures due tomorrow" : n === -1 ? "Day 1 figures due today" : "Collections pending";
+  return `<p class="week-figure week-pending">${note}</p>`;
+}
+
+// The critics' average and how many reviews it's from. On a narrow card the count drops to a second
+// line after the dot, never in the middle of "5.7/10" or "9 reviews".
+function weekRating(m) {
+  const cs = criticsScore(m);
+  if (!cs) return "";
+  return `<p class="week-rating"><i data-lucide="star" class="star-icon"></i><span>Critics <strong>${cs.score.toFixed(1)}</strong>/10 ·</span> <span>${cs.count} ${cs.count === 1 ? "review" : "reviews"}</span></p>`;
+}
+
+// The films-grid card: poster, title, "Tamil | UA 16+", the status, then the numbers
+function weekCard(m) {
+  const [status, tone] = weekStatus(m);
+  return `
+    <article class="movie-card film-card week-card">
+      ${cardPoster(m)}
+      <div class="card-info week-info">
+        <h3 class="card-title"><a class="card-link" href="${filmURL(m)}">${esc(m.title)}</a></h3>
+        ${pipeLine([m.lang && esc(m.lang), m.cert && esc(m.cert)], "card-meta")}
+        <p class="week-status ${tone}">${esc(status)}</p>
+        ${weekFigure(m)}
+        ${weekRating(m)}
+      </div>
+    </article>`;
+}
+
+(function renderNewThisWeek() {
+  $("newWeekRange").textContent = `Releases from ${dayLabel(weekStart)} to ${dayLabel(weekEnd)}`;
+  const grid = $("newWeekGrid");
+  grid.classList.toggle("is-empty", !newThisWeek.length);
+  grid.innerHTML = newThisWeek.length
+    ? newThisWeek.map(weekCard).join("")
+    : `<p class="week-empty">No new releases this week.</p>`;
 })();
 
 // ---------- Box office leaderboard ----------
@@ -565,9 +827,13 @@ function renderFilms() {
   filmList = sortFilms(releasedFilms.filter(m => matches(m) && (year === "all" || filmFacts(m).year === year)), filmFilters.sort);
   filmShown = Math.min(FILM_PAGE, filmList.length);
   // This grid holds released films only, so point to an upcoming film the search would have found
-  const soon = q ? upcomingFilms.filter(matches) : [];
+  // (in New this week when it releases this week, else in Coming soon)
+  const soon = q ? upcomingFilms.filter(matches).sort((a, b) => inNewThisWeek.has(b) - inNewThisWeek.has(a)) : [];
+  const thisWeek = soon.filter(m => inNewThisWeek.has(m)).length;
+  const where = !thisWeek ? ["#coming-soon", "Coming soon"]
+    : thisWeek === soon.length ? ["#new-this-week", "New this week"] : ["#new-this-week", "New this week and Coming soon"];
   const soonHint = soon.length
-    ? ` <a class="empty-link" href="#coming-soon">See ${esc(soon[0].title)}${soon.length > 1 ? ` and ${soon.length - 1} more` : ""} in Coming soon.</a>`
+    ? ` <a class="empty-link" href="${where[0]}">See ${esc(soon[0].title)}${soon.length > 1 ? ` and ${soon.length - 1} more` : ""} in ${where[1]}.</a>`
     : " Try another search, language or year.";
   const grid = $("filmGrid");
   grid.innerHTML = filmList.length
@@ -668,8 +934,8 @@ function soonCard(m) {
     </article>`;
 }
 
-// Soonest first; films without an exact date go last
-const soonList = [...upcomingFilms].sort((a, b) =>
+// Soonest first; films without an exact date go last. Films releasing this week are in New this week instead.
+const soonList = upcomingFilms.filter(m => !inNewThisWeek.has(m)).sort((a, b) =>
   (daysUntil(a) ?? Infinity) - (daysUntil(b) ?? Infinity) || (Number(a.year) || 9999) - (Number(b.year) || 9999) || byTitle(a, b));
 const soonGrid = $("soonGrid");
 if (!soonList.length) {
@@ -698,15 +964,14 @@ if (due.length) toast(due.length === 1 ? `${due[0].title} is out now. See its fi
 
 // ---------- How we track ----------
 (function renderTrackStats() {
-  const count = n => n.toLocaleString("en-IN");
   const stats = [
-    [releasedFilms.filter(m => { const f = filmFacts(m); return f.ww !== null || f.net !== null || f.opening !== null; }).length, "Films tracked"],
+    [trackedFilms.length, "Films tracked"],
     [languagesIn(MOVIES).length, "Languages"],
     [MOVIES.reduce((n, m) => n + dayRows(m).length, 0), "Days of collections"],
     [MOVIES.reduce((n, m) => n + (criticsScore(m)?.count || 0), 0), "Critic reviews counted"],
   ];
   $("trackStats").innerHTML = stats
-    .map(([n, label]) => `<div><dt>${label}</dt><dd>${count(n)}</dd></div>`).join("");
+    .map(([n, label]) => `<div><dt>${label}</dt><dd>${countText(n)}</dd></div>`).join("");
 })();
 
 // ---------- Footer ----------
@@ -784,22 +1049,61 @@ $("contactForm").addEventListener("submit", e => {
   }
 });
 
+// The sections above are drawn by this script, so the browser's own jump to a #fragment can land
+// short. Jump now and again once images and fonts have loaded, without the smooth scroll.
+function jumpTo(section, then) {
+  const jump = () => {
+    const root = document.documentElement;
+    root.style.scrollBehavior = "auto";
+    section.scrollIntoView({ block: "start" });
+    root.style.scrollBehavior = "";
+    then?.();
+  };
+  jump();
+  if (document.readyState !== "complete") addEventListener("load", jump, { once: true });
+}
+
 // index.html?report=<id>#contact: open the form ready to report a figure for that film
 const reportId = new URLSearchParams(location.search).get("report");
 if (reportId !== null) {
   setTopic("Report a wrong figure");
   if (getMovie(reportId)) fFilm.value = Number(reportId);
-  // The sections above are drawn by this script, so the browser's own jump to #contact can land
-  // short. Jump now and again once images and fonts have loaded, without the smooth scroll.
-  const jumpToForm = () => {
-    const root = document.documentElement;
-    root.style.scrollBehavior = "auto";
-    $("contact").scrollIntoView({ block: "start" });
-    root.style.scrollBehavior = "";
-    fMsg.focus({ preventScroll: true });
-  };
-  jumpToForm();
-  if (document.readyState !== "complete") addEventListener("load", jumpToForm, { once: true });
+  jumpTo($("contact"), () => fMsg.focus({ preventScroll: true }));
+}
+
+// ---------- Photo credits ----------
+// Each star photo with its author, licence and source, as the licences ask; the poster photos are
+// listed in index.html. The list opens when a link (the footer's, or another page's) points to #credits.
+const httpsOnly = url => (/^https:\/\//i.test(String(url || "")) ? String(url) : "");
+// "File:Mammootty,_2022.jpg" in a Commons address -> "Mammootty, 2022.jpg"
+function commonsFile(url) {
+  try {
+    return decodeURIComponent(new URL(url).pathname.split("/wiki/").pop()).replace(/^File:/, "").replace(/_/g, " ");
+  } catch {
+    return "File page";
+  }
+}
+const outLink = (url, text) => (url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(text)}</a>` : esc(text));
+$("starCredits").innerHTML = coverStars.map(s => `
+  <li><strong>${esc(s.name)}</strong>: ${esc(s.author)}, ${outLink(httpsOnly(s.licenceUrl), s.licence)}, via Wikimedia Commons (${outLink(httpsOnly(s.source), commonsFile(s.source))}) — cropped</li>`).join("");
+$("starCredits").hidden = !coverStars.length;
+$("starCreditsHead").hidden = !coverStars.length;
+$("creditsSummary").textContent = `Photo credits (${document.querySelectorAll("#credits .credit-list > li").length} photos)`;
+
+const creditsBox = $("creditsBox");
+const openCredits = () => { if (location.hash === "#credits") creditsBox.open = true; };
+addEventListener("hashchange", openCredits);
+// Following the link again when the address already ends in #credits doesn't change the hash
+document.addEventListener("click", e => { if (e.target.closest('a[href="#credits"]')) creditsBox.open = true; });
+if (location.hash === "#credits") {
+  openCredits();
+  jumpTo($("credits"));
 }
 
 icons();
+
+// index.html#box-office, #films and the like (the other pages link to these): the browser jumps before
+// this script has drawn the cover, New this week and the rest above, so it lands short. Jump again.
+const hashSection = reportId === null && location.hash.length > 1 && location.hash !== "#credits"
+  ? document.getElementById(location.hash.slice(1)) : null;
+if (hashSection && !hashSection.hidden) jumpTo(hashSection);

@@ -486,6 +486,8 @@ input:user-invalid:not(:focus) { border-color: var(--danger); }   /* own rule: o
   .form-row.three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* A half-width date box cuts its "dd-mm-yyyy" short: the release date takes the row, note and year share the next */
   .form-row.three > .field:has(> input[type="date"]) { grid-column: 1 / -1; }
+  /* The photo path is long too: it takes its own row under the two poster colours */
+  .form-row.three > .field:has(> #fImage) { grid-column: 1 / -1; }
   .bar-row { grid-template-columns: minmax(0, 1fr) minmax(6.5em, auto); gap: 8px 12px; }
   .bar-track { grid-column: 1 / -1; grid-row: 2; }
   .editor-bar-actions { width: 100%; }

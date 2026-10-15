@@ -768,7 +768,7 @@ function fixSavedSeedFigures(saved) {
 // The catalogue grew to every Indian language (ids 1001+). A browser that saved its own copy of the
 // films keeps it, so those films are added to that copy once. Only ids 1001+ are added, so films the
 // admin deleted from the original catalogue don't come back.
-const CATALOG_VERSION = 2;
+const CATALOG_VERSION = 3;   // 3: this week's releases (ids 3001+)
 (function addAllIndiaFilms() {
   try {
     if (Number(localStorage.getItem("manaCatalog")) >= CATALOG_VERSION) return;
