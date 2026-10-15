@@ -117,12 +117,14 @@ const HEROES = {
   },
 };
 
-function heroArt(m, cls = "poster-art") {
+// align: where the figure sits when the box crops it ("xMidYMax" keeps the feet on posters; "xMidYMid"
+// centres the bust in a circle)
+function heroArt(m, cls = "poster-art", align = "xMidYMax") {
   const hero = HEROES[m.art];
   if (!hero) return "";
   const id = ++artId;
   return `
-    <svg class="${cls}" viewBox="0 0 200 300" preserveAspectRatio="xMidYMax slice" aria-hidden="true" focusable="false">
+    <svg class="${cls}" viewBox="0 0 200 300" preserveAspectRatio="${align} slice" aria-hidden="true" focusable="false">
       <defs>
         <radialGradient id="glow${id}" cx="50%" cy="36%" r="50%">
           <stop offset="0" stop-color="#fff" stop-opacity=".42" />

@@ -139,14 +139,12 @@ const trackedFilms = releasedFilms.filter(m => { const f = filmFacts(m); return 
 const countText = n => n.toLocaleString("en-IN");
 
 // ---------- Cover: the star ring ----------
-// Pawan Kalyan in the centre, heroes from every language on two rings around him (js/cover-stars.js).
-// The centre star is styled after They Call Him OG and links to its film page, with its tag and figures
-// under his name; every other star links to the box-office lists for his language.
-// From 1024px up the stars sit on two ellipses worked out below from the stage's width and the screen's
-// height; narrower screens lay them out in CSS (a wrapping grid on tablets, one sideways-scrolling row on phones).
+// Pawan Kalyan in the centre (the drawn OG artwork, in a red ring), heroes from every language packed closely
+// on two rings around him (js/cover-stars.js). Every star links to the box-office lists for his language.
+// From 1024px up the stars sit on two ellipses worked out below from the middle circle's size and the
+// screen's height; narrower screens lay them out in CSS (a wrapping grid on tablets, one sideways-scrolling
+// row on phones).
 const STAR_LEAD = "pawan-kalyan";
-const LEAD_FILM_ID = 10;   // They Call Him OG
-const leadFilm = getMovie(LEAD_FILM_ID);
 // Clockwise from the top. The outer ring starts half a step on, so its stars sit between the inner ones.
 const STAR_RINGS = [
   ["prabhas", "allu-arjun", "jr-ntr", "ram-charan", "shah-rukh-khan", "rajinikanth", "mohanlal", "yash", "vijay"],
@@ -177,28 +175,17 @@ function starHTML(s, i) {
     </a>`;
 }
 
-// "₹295.22 Cr worldwide · Hit": the OG film's worldwide gross and verdict, leaving out whichever isn't in
-function leadFigures(m) {
-  const ww = worldwideGross(m), v = verdict(m);
-  return [
-    ww !== null && `${crore(ww)} worldwide`,
-    v && `${v.running ? "Trending: " : ""}${v.label}${v.indicative || v.running ? "*" : ""}`,
-  ].filter(Boolean).join(" · ");
-}
-
-// The centre star: his photo in a red ring, his name, then the film's tag and figures. It links to the
-// film's page; without the film (an admin removed it) it links to his language's lists like the others.
+// The centre: the site's own They Call Him OG artwork (js/art.js), no photo and no text, in a red ring.
+// It opens the OG film page (or his language's lists if that film has been removed); the link's label
+// says so.
+const OG_FILM_ID = 10;
 function leadHTML(s) {
-  const m = leadFilm;
-  const figures = m ? leadFigures(m) : "";
+  const og = getMovie(OG_FILM_ID);
+  const href = og ? `film.html?id=${OG_FILM_ID}` : listsLink(s);
+  const label = og ? `${s.name} in ${og.title}: box office` : `${s.name}: ${s.lang} box office lists`;
   return `
-    <a class="star star-lead${m ? " star-og" : ""}" href="${m ? filmURL(m) : listsLink(s)}" aria-label="${esc(m ? `${s.name}: ${m.title} box office` : `${s.name}: ${s.lang} box office lists`)}" style="--i:0">
-      <span class="star-photo"><img src="${esc(s.img)}" width="520" height="520" alt="${esc(s.name)}" decoding="async" loading="eager" fetchpriority="high"></span>
-      <span class="lead-caption">
-        <span class="star-name">${esc(s.name)}</span>
-        ${m ? `<span class="og-tag">${esc(m.title)}</span>` : ""}
-        ${figures ? `<span class="og-figures">${esc(figures)}</span>` : ""}
-      </span>
+    <a class="star star-lead star-og" href="${href}" aria-label="${esc(label)}" style="--i:0">
+      <span class="star-photo star-art">${heroArt({ art: "og" }, "star-art-svg", "xMidYMid")}</span>
     </a>`;
 }
 
@@ -213,23 +200,25 @@ if (starLead) {
   starStage.hidden = true;
 }
 
-// The rings are ellipses around the middle circle. The outer ring is as wide as the stage allows (its
-// widest star just fits) and the inner ring is a share of it (see below). Their heights start in proportion to
-// their widths, squashed if need be so the title, the rings and the calls to action fit on the first
-// screen; then each half of a ring (above and below the middle) grows taller until no star comes within
-// STAR_GAP of another or of the middle star. The gap always wins over fitting the screen. A star counts
-// as the box around its circle and name, so names never touch either; the middle star counts as its
-// circle and the caption under it (name, film tag, figures). The halves are sized separately because the
-// caption and the names hang below the circles, so the rings need more room below the middle than above.
+// The rings are ellipses packed closely around the middle circle. The outer ring reaches at most
+// RING_REACH middle-circle widths from the centre (less if the stage is narrower) and the inner ring is a
+// share of it (see below). Their heights start in proportion to their widths, squashed if need be so the
+// title, the rings and the calls to action fit on the first screen; then each half of a ring (above and
+// below the middle) grows taller until no star comes within STAR_GAP of another or of the middle circle.
+// The gap always wins over fitting the screen. A star counts as the box around its circle and name, so
+// names never touch either. The halves are sized separately because the names hang below the circles, so
+// the rings need more room below the middle than above.
 // The stage then takes the height the rings need (8px spare above the top circle and below the lowest
 // name), with the middle circle at its horizontal centre.
 const ringMode = matchMedia("(min-width: 1024px)");
 // Inner ring width : outer (the usual share first, then others to try); height : width of each ring
 // before any squashing. The outer ring stays at least `orbit` times as tall as the inner one (above and
 // below), so it still reads as the outer orbit.
-const RING_SHAPE = { inner: [0.72, 0.76, 0.68, 0.8], innerTall: 0.68, outerTall: 0.6, orbit: 1.1 };
+const RING_SHAPE = { inner: [0.62, 0.66, 0.58, 0.7], innerTall: 0.78, outerTall: 0.66, orbit: 1.1 };
 const SQUASH_MIN = 0.3;   // the flattest the rings start, as a share of the heights above
-const STAR_GAP = 12;
+const STAR_GAP = 8;
+// The stars stay close to the middle: the outer ring is at most this many middle-circle widths from the centre
+const RING_REACH = 2.35;
 
 // Room for the stage on the first screen: the window less what sits above the stage (navbar, the cover's
 // top padding, the title) and the calls to action under it, with 12px to spare
@@ -251,12 +240,8 @@ function layoutStars() {
   const half = starStage.clientWidth / 2 - 4;   // stars stay 4px inside the stage
   const lead = starStage.querySelector(".star-lead");
   const leadD = lead.querySelector(".star-photo").offsetWidth;
-  const caption = lead.querySelector(".lead-caption");
-  // Boxes are measured from the centre of the middle circle: the circle, then the caption under it
-  const fixed = [
-    { x0: -leadD / 2, x1: leadD / 2, y0: -leadD / 2, y1: leadD / 2 },
-    { x0: -caption.offsetWidth / 2, x1: caption.offsetWidth / 2, y0: caption.offsetTop - leadD / 2, y1: caption.offsetTop + caption.offsetHeight - leadD / 2 },
-  ];
+  // Boxes are measured from the centre of the middle circle (just the circle: it has no caption)
+  const fixed = [{ x0: -leadD / 2, x1: leadD / 2, y0: -leadD / 2, y1: leadD / 2 }];
   const stars = [...starStage.querySelectorAll(".star-ring > li")].map(li => {
     const ring = Number(li.dataset.ring);
     const step = 2 * Math.PI / starRings[ring].length;
@@ -270,7 +255,7 @@ function layoutStars() {
     };
   });
   const fit = list => Math.min(half - 40, ...list.map(s => (half - s.w / 2) / Math.max(Math.abs(Math.sin(s.angle)), 0.2)));
-  const outerX = fit(stars.filter(s => s.ring === 1));
+  const outerX = Math.min(fit(stars.filter(s => s.ring === 1)), leadD * RING_REACH);
   const innerMax = fit(stars.filter(s => s.ring === 0));
   const near = (p, q) => Math.min(p.x1, q.x1) - Math.max(p.x0, q.x0) > -STAR_GAP && Math.min(p.y1, q.y1) - Math.max(p.y0, q.y0) > -STAR_GAP;
 
@@ -1084,10 +1069,11 @@ function commonsFile(url) {
   }
 }
 const outLink = (url, text) => (url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(text)}</a>` : esc(text));
-$("starCredits").innerHTML = coverStars.map(s => `
+const creditedStars = coverStars.filter(s => s.img && s.source);
+$("starCredits").innerHTML = creditedStars.map(s => `
   <li><strong>${esc(s.name)}</strong>: ${esc(s.author)}, ${outLink(httpsOnly(s.licenceUrl), s.licence)}, via Wikimedia Commons (${outLink(httpsOnly(s.source), commonsFile(s.source))}) — cropped</li>`).join("");
-$("starCredits").hidden = !coverStars.length;
-$("starCreditsHead").hidden = !coverStars.length;
+$("starCredits").hidden = !creditedStars.length;
+$("starCreditsHead").hidden = !creditedStars.length;
 $("creditsSummary").textContent = `Photo credits (${document.querySelectorAll("#credits .credit-list > li").length} photos)`;
 
 const creditsBox = $("creditsBox");

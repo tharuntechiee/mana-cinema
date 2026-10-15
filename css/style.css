@@ -833,7 +833,7 @@ body::after { opacity: calc(var(--pattern-opacity) * .45); }
    where it can; narrower screens flow the stars in CSS: a wrapping grid on tablets, one
    sideways-scrolling row on phones. */
 .cover {
-  --og-red: #e5172b; --og-red-rgb: 229, 23, 43;   /* the OG centre star: its ring and tag */
+  --og-red: #e5172b; --og-red-rgb: 229, 23, 43;   /* the centre star's red ring */
   display: flex; flex-direction: column; justify-content: center;
   min-height: min(calc(100vh - 73px), 980px); min-height: min(calc(100svh - 73px), 980px);
   padding: 40px 0 48px; background: var(--bg); overflow-x: clip;
@@ -878,18 +878,12 @@ body::after { opacity: calc(var(--pattern-opacity) * .45); }
   .star { animation: none; }
 }
 
-/* The centre star, in the OG style: a red ring with the site's only glow, his name, a red "They Call Him OG"
-   tag and the film's figures in a muted line. (Without the film it keeps a plain blue ring.) */
+/* The centre: the drawn OG artwork, in a red ring with the site's only glow */
 .star-lead .star-photo { border: 5px solid var(--gold); }
 .star-og .star-photo { border-color: var(--og-red); box-shadow: 0 0 28px rgba(var(--og-red-rgb), .32); }
 .star-og:hover .star-photo, .star-og:focus-visible .star-photo { border-color: var(--og-red); box-shadow: 0 0 36px rgba(var(--og-red-rgb), .5); }
-.lead-caption { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 10px; }
-.star-lead .star-name { max-width: none; margin-top: 0; font-size: var(--lead-name); font-weight: 700; line-height: 1.3; letter-spacing: -0.02em; white-space: nowrap; }
-.og-tag {
-  padding: 2px 10px; border-radius: 999px; background: var(--og-red); color: #fff;
-  font-size: var(--fs-label); font-weight: 600; line-height: 1.5; white-space: nowrap;
-}
-.og-figures { color: var(--muted); font-size: .8125rem; font-weight: 500; line-height: 1.4; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.star-art { background: linear-gradient(160deg, #b3121b, #0a0000); }
+.star-art-svg { display: block; width: 100%; height: 100%; border-radius: 50%; }
 
 /* Rings (1024px and up): the middle star at the stage's centre, the others offset from it.
    The language shows as a small pill on the circle while a star is hovered or focused. */
