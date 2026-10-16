@@ -22,7 +22,7 @@ const DASH = `<span class="muted">–</span>`;
 const NEW_TAB = `<span class="sr-only"> (opens in a new tab)</span>`;
 // Credits IMDb's and TMDB's terms ask for wherever their data is shown
 const IMDB_CREDIT = `Information courtesy of IMDb (<a class="text-link" href="https://www.imdb.com" target="_blank" rel="noopener">imdb.com</a>). Used with permission.`;
-const TMDB_CREDIT = `This product uses the TMDB API but is not endorsed or certified by <a class="text-link" href="https://www.themoviedb.org" target="_blank" rel="noopener">TMDB</a>.`;
+const TMDB_CREDIT = `This website uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by <a class="text-link" href="https://www.themoviedb.org" target="_blank" rel="noopener">TMDB</a>.`;
 
 // Only plain web links become clickable; anything else stays text
 function safeUrl(u) {

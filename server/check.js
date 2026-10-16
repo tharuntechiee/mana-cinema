@@ -11,7 +11,7 @@ process.env.AUTO_SYNC_RATINGS = "false";
 
 const { ensureSeeded } = await import("./seed.js");
 const { createApp } = await import("./app.js");
-const { db } = await import("./db.js");
+const { db, replaceCredits } = await import("./db.js");
 ensureSeeded({ log: () => {} });
 const server = createApp().listen(0);
 await new Promise(r => server.once("listening", r));
@@ -70,6 +70,17 @@ try {
   check((await call("POST", "/api/messages", { name: "Check", message: "Hello", topic: "Other feedback" })).status === 201, "feedback form saves a message");
   check((await call("POST", "/api/messages", { name: "", message: "" })).status === 400, "empty feedback is refused");
   check((await call("POST", "/api/messages", { name: "X", message: "Y" }, { origin: "https://evil.example" })).status === 403, "other websites can't post");
+
+  // Search by cast and crew
+  replaceCredits(10, "tmdb", [
+    { kind: "cast", name: "Pawan Kalyan", tmdbId: 1, character: "Ojas Gambheera" },
+    { kind: "crew", name: "Sujeeth", tmdbId: 2, department: "Directing", job: "Director" },
+  ]);
+  const byActor = (await call("GET", "/api/search?q=pawan%20kalyan")).json;
+  check(byActor.movies[0]?.id === 10 && byActor.movies[0].why === "Cast: Pawan Kalyan as Ojas Gambheera" && byActor.people[0]?.name === "Pawan Kalyan", "search finds a film by its actor");
+  check((await call("GET", "/api/search?q=SUJEETH")).json.movies[0]?.why === "Director: Sujeeth", "search finds a film by its director, in any case");
+  check((await call("GET", "/api/search?q=k")).json.movies.length === 0 && (await call("GET", "/api/search?q=%25_%25")).json.movies.length === 0, "one letter or wildcards find nothing");
+  replaceCredits(10, "tmdb", []);
 
   // Comments
   const c1 = await call("POST", "/api/movies/10/comments", { name: "Check", text: "Loved the climax" }, { asVisitor: true });

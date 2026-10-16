@@ -11,6 +11,7 @@ Box office collections, verdicts and ratings for Indian films in nine languages:
 - **Box office leaderboard:** rank films by opening day, opening weekend, first 7 days, lifetime India net, worldwide gross or rating. Filter by language and year, and include or leave out paid previews.
 - **Lists** (`lists.html`): for every language, the all-time top grossers (top 25 for Hindi, Telugu, Tamil, Malayalam and Kannada; top 10 for Marathi, Bengali, Punjabi and Gujarati) and the biggest opening days.
 - **Film pages:** for about 30 big recent releases, Day 1, Day 2 … every reported day, with a chart, weekend and trade-week totals, milestones (₹100 Cr on Day 2 …), how the run held up, Day 1 by language, budget, verdict and sources. Older and smaller films show their reported totals, opening day, verdict and rank in their language.
+- **Search:** a magnifier beside the theme button (or press `/` or Ctrl+K) opens a search box. It finds films by title, director, actor, language or year, and on the server by anyone in a film's full cast and crew, such as a music director.
 - **Cast & crew:** from IMDb (principal cast and crew) or TMDB (everyone), with each actor's role and the crew by department.
 - **Ratings:** critics' scores, IMDb's rating refreshed daily from IMDb, plus audience star ratings and short reviews.
 - **Comments:** YouTube-style comments on every film page: comment, reply in threads, like or dislike, sort by Top or Newest, edit or delete your own. No account needed. MANA CINEMA can pin, heart, hide and delete comments and reply as "Official" from the admin portal.
@@ -80,6 +81,7 @@ Public:
 | `GET /api/movies/:id/credits` | Full cast and crew |
 | `GET /api/movies/:id/reviews` | Audience reviews |
 | `POST /api/movies/:id/reviews` | Rate a film: `{ name, stars, text }` |
+| `GET /api/search?q=` | Films by anyone in the cast and crew |
 | `GET /api/people/:id` | A person and their films |
 | `GET` / `POST /api/movies/:id/comments` | Comments (`?sort=top` or `new`), post a comment or reply |
 | `GET /api/comments/:id/replies` | A thread's replies |
@@ -125,6 +127,7 @@ How every total is worked out (paid previews, 4-day Thursday weekends, Friday-to
 
 - `.env` holds the admin password and keys. It is never served and never committed. The database in `data/` is not committed either.
 - IMDb's datasets are for personal and non-commercial use. A commercial site needs IMDb's paid licence.
+- TMDB's free licence is non-commercial too: ads, paid features or any revenue need a written agreement with TMDB. Its terms also ask for the TMDB logo next to the credit line, which isn't added yet.
 - The admin password in `js/admin.js` only guards the browser-only demo. On the server, the password in `.env` is checked by the server.
 - Audience ratings and comments use an anonymous cookie, so each visitor has one rating per film and can edit or delete only their own comments. Clearing cookies means losing that ability, not the comment. Only the admin can post as MANA CINEMA.
 - Comments are plain text (no links or HTML), up to 1,500 characters, and rate-limited per visitor.
@@ -157,4 +160,4 @@ data/             The database and IMDb download cache (not committed)
 
 ## Credits
 
-Poster and hero photos are free-licensed files from Wikimedia Commons, cropped to circles; every photo is credited in the Photo credits section on the home page. IMDb ratings and cast & crew: information courtesy of IMDb (https://www.imdb.com), used with permission. With a TMDB key, this product uses the TMDB API but is not endorsed or certified by TMDB. Visual style inspired by District's movie app; this project is not affiliated with District or Zomato. Synopses are our own short summaries.
+Poster and hero photos are free-licensed files from Wikimedia Commons, cropped to circles; every photo is credited in the Photo credits section on the home page. IMDb ratings and cast & crew: information courtesy of IMDb (https://www.imdb.com), used with permission. With a TMDB key, this website uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB. Visual style inspired by District's movie app; this project is not affiliated with District or Zomato. Synopses are our own short summaries.

@@ -1,4 +1,4 @@
-// Shared UI behaviour for every page: themes, icons, navbar, mobile menu, toasts, scroll reveal
+// Shared UI behaviour for every page: themes, search, icons, navbar, mobile menu, toasts, scroll reveal
 document.documentElement.classList.add("js");
 
 // ---------- Icons (Lucide) ----------
@@ -121,6 +121,214 @@ function setTheme(id, animate = true, save = true) {
   wrap.addEventListener("focusout", e => { if (e.relatedTarget && !wrap.contains(e.relatedTarget)) close(); });
 })();
 setTheme(currentTheme(), false, false);
+
+// ---------- Search ----------
+// A magnifier button beside the theme button opens a search box over the page. It finds films by title,
+// director, starring names, genre, language and year right in the browser, and, on the server, by anyone
+// in a film's cast and crew (api/search). "/" or Ctrl+K opens it from anywhere. Public pages only.
+(function buildSearch() {
+  const nav = document.querySelector(".nav-inner");
+  const themeWrap = nav && nav.querySelector(".theme-wrap");
+  if (!nav || !themeWrap || nav.classList.contains("admin-top")) return;
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "icon-btn";
+  btn.id = "searchBtn";
+  btn.setAttribute("aria-label", "Search films");
+  btn.setAttribute("aria-haspopup", "dialog");
+  btn.title = "Search ( / )";
+  btn.innerHTML = `<i data-lucide="search"></i>`;
+  nav.insertBefore(btn, themeWrap);
+
+  const dialog = document.createElement("dialog");
+  dialog.className = "search-dialog";
+  dialog.id = "searchDialog";
+  dialog.setAttribute("aria-label", "Search films");
+  dialog.innerHTML = `
+    <form class="search-box" role="search" id="searchForm">
+      <i data-lucide="search" aria-hidden="true"></i>
+      <input type="search" id="searchInput" placeholder="Search films, actors, directors, languages" autocomplete="off" spellcheck="false" enterkeyhint="search" aria-label="Search films, actors, directors or languages" maxlength="60">
+      <button type="button" class="search-close" id="searchClose" aria-label="Close search"><i data-lucide="x"></i></button>
+    </form>
+    <div class="search-body" id="searchBody"></div>
+    <p class="sr-only" id="searchStatus" role="status" aria-live="polite"></p>`;
+  document.body.appendChild(dialog);
+
+  const input = dialog.querySelector("#searchInput");
+  const body = dialog.querySelector("#searchBody");
+  const status = dialog.querySelector("#searchStatus");
+  const MAX_ROWS = 20;
+  const state = { seq: 0, query: "", remote: null, timer: 0 };
+
+  // Lower case, no accents or punctuation: "Dhurandhar: The Revenge" -> "dhurandhar the revenge"
+  const fold = s => String(s ?? "").toLowerCase().normalize("NFKD").replace(/\p{M}/gu, "").replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").trim();
+  let index = null;
+  const build = () => MOVIES.map(m => ({
+    m,
+    title: fold(m.title),
+    people: fold([m.director, m.cast].filter(Boolean).join(" ")),
+    other: fold([m.lang, ...(m.languages || []), m.genre, m.year, String(m.release || "").slice(0, 4)].filter(Boolean).join(" ")),
+  }));
+
+  // How well a film matches: every word typed must be found somewhere; title matches count most
+  function score(e, tokens, q) {
+    let total = 0;
+    for (const t of tokens) {
+      let best;
+      if (e.title.split(" ").some(w => w.startsWith(t))) best = e.title.startsWith(t) ? 100 : 70;
+      else if (e.title.includes(t)) best = 45;
+      else if (e.people.split(" ").some(w => w.startsWith(t))) best = 30;
+      else if (e.people.includes(t)) best = 20;
+      else if (e.other.split(" ").some(w => w.startsWith(t))) best = 15;
+      else return 0;
+      total += best;
+    }
+    if (e.title === q) total += 200;
+    else if (e.title.startsWith(q)) total += 60;
+    return total;
+  }
+  // Why a film showed up when its title doesn't say: the director, or the starring name that matched
+  function why(m, tokens) {
+    if (tokens.every(t => fold(m.title).includes(t))) return "";
+    const has = text => tokens.every(t => fold(text).includes(t));
+    if (m.director && has(m.director)) return `Director: ${m.director}`;
+    const star = String(m.cast || "").split(",").map(s => s.trim()).find(has);
+    return star ? `Starring: ${star}` : "";
+  }
+  const popularity = m => (typeof worldwideGross === "function" ? worldwideGross(m) : null) ?? (typeof indiaNet === "function" ? indiaNet(m) : null) ?? 0;
+  const yearOf = m => Number(m.year) || Number(String(m.release || "").slice(0, 4)) || 0;
+
+  function localHits(q) {
+    const tokens = q.split(" ").filter(Boolean);
+    index = index || build();
+    return index
+      .map(e => ({ m: e.m, s: score(e, tokens, q) }))
+      .filter(h => h.s > 0)
+      .sort((a, b) => b.s - a.s || popularity(b.m) - popularity(a.m) || yearOf(b.m) - yearOf(a.m))
+      .map(h => ({ m: h.m, why: why(h.m, tokens) }));
+  }
+
+  function metaLine(m) {
+    const parts = [m.lang, yearOf(m) || ""].filter(Boolean);
+    const imdb = typeof imdbScore === "function" ? imdbScore(m) : null;
+    if (imdb) parts.push(`IMDb ${imdb.score.toFixed(1)}`);
+    else if (typeof isReleased === "function" && !isReleased(m)) parts.push("Coming soon");
+    return parts.join(" · ");
+  }
+  const hitHTML = ({ m, why: reason }) => `
+    <li><a class="search-hit" href="film.html?id=${Number(m.id)}">
+      <span class="search-poster">${posterHTML(m, { compact: true })}</span>
+      <span class="search-info">
+        <strong>${esc(m.title)}</strong>
+        <small>${esc(metaLine(m))}</small>
+        ${reason ? `<small class="search-why">${esc(reason)}</small>` : ""}
+      </span>
+    </a></li>`;
+
+  function render() {
+    const q = state.query;
+    if (!q) {
+      // Nothing typed yet: the biggest films, and what can be searched
+      index = index || build();
+      const top = MOVIES.filter(m => typeof isReleased !== "function" || isReleased(m))
+        .sort((a, b) => popularity(b) - popularity(a)).slice(0, 6).map(m => ({ m, why: "" }));
+      body.innerHTML = `<p class="search-hint">Search by film title, actor, director, language or year.</p>
+        ${top.length ? `<h2 class="search-head">Biggest films</h2><ul class="search-list">${top.map(hitHTML).join("")}</ul>` : ""}`;
+      status.textContent = "";
+      icons();
+      return;
+    }
+    if (q.length < 2) {   // one letter would match half the catalogue
+      body.innerHTML = `<p class="search-hint">Keep typing: at least two letters.</p>`;
+      status.textContent = "";
+      return;
+    }
+    const tokens = q.split(" ").filter(Boolean);
+    const local = localHits(q);
+    const seen = new Map(local.map(h => [h.m.id, h]));
+    // The server adds films credited to a matching person; for a film already found it adds the reason
+    const extra = [];
+    for (const r of (state.remote && state.remote.q === q ? state.remote.movies : [])) {
+      const known = seen.get(r.id);
+      if (known) { if (!known.why) known.why = r.why; continue; }
+      const m = typeof getMovie === "function" ? getMovie(r.id) : null;
+      if (m) extra.push({ m, why: r.why });
+    }
+    const hits = [...local, ...extra].slice(0, MAX_ROWS);
+    body.innerHTML = hits.length
+      ? `<ul class="search-list">${hits.map(hitHTML).join("")}</ul>`
+      : `<p class="search-hint">No films match "${esc(input.value.trim())}". Try a shorter name, or search by an actor, director or language.</p>`;
+    status.textContent = hits.length ? `${hits.length} ${hits.length === 1 ? "result" : "results"}` : "No results";
+    icons();
+    body.scrollTop = 0;
+  }
+
+  // The server's cast-and-crew search runs a moment after typing stops; the browser's own results show at once
+  function ask(q) {
+    clearTimeout(state.timer);
+    state.remote = null;
+    if (!ONLINE || q.length < 2) return;
+    const seq = ++state.seq;
+    state.timer = setTimeout(async () => {
+      try {
+        const data = await api(`search?q=${encodeURIComponent(q)}`);
+        if (seq !== state.seq || state.query !== q) return;
+        state.remote = { q, movies: data.movies || [] };
+        render();
+      } catch {}   // the results already shown stay
+    }, 220);
+  }
+
+  input.addEventListener("input", () => {
+    state.query = fold(input.value);
+    render();
+    ask(state.query);
+  });
+
+  const open = () => {
+    if (dialog.open) return;
+    if (typeof setMenu === "function" && navLinks?.classList.contains("open")) setMenu(false);
+    dialog.showModal();
+    document.documentElement.classList.add("search-open");
+    state.query = fold(input.value);
+    render();
+    input.focus();
+    input.select();
+  };
+  btn.addEventListener("click", open);
+  dialog.addEventListener("close", () => document.documentElement.classList.remove("search-open"));
+  dialog.querySelector("#searchClose").addEventListener("click", () => dialog.close());
+  // A click on the dimmed page around the box closes it; a click on a result goes to the film
+  dialog.addEventListener("click", e => {
+    if (e.target === dialog) dialog.close();
+    else if (e.target.closest(".search-hit")) dialog.close();
+  });
+  dialog.querySelector("#searchForm").addEventListener("submit", e => {
+    e.preventDefault();
+    body.querySelector(".search-hit")?.click();   // Enter opens the top result
+  });
+  // Arrow keys move between the results; going up from the first goes back to the box
+  dialog.addEventListener("keydown", e => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    const hits = [...body.querySelectorAll(".search-hit")];
+    if (!hits.length) return;
+    const i = hits.indexOf(document.activeElement);
+    e.preventDefault();
+    if (e.key === "ArrowDown") (hits[i + 1] || hits[hits.length - 1]).focus();
+    else if (i <= 0) input.focus();
+    else hits[i - 1].focus();
+  });
+  // "/" or Ctrl+K from anywhere on the page
+  document.addEventListener("keydown", e => {
+    const typing = e.target.closest && e.target.closest("input, textarea, select, [contenteditable='true']");
+    const slash = e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey && !typing;
+    const ctrlK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k";
+    if (!slash && !ctrlK) return;
+    e.preventDefault();
+    open();
+  });
+})();
 
 // ---------- Navbar ----------
 const navbar = document.querySelector(".navbar");

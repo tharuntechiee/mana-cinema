@@ -7,6 +7,7 @@
 //   GET  /api/movies/:id/credits      full cast and crew from the database
 //   GET  /api/movies/:id/reviews      visible audience reviews
 //   POST /api/movies/:id/reviews      rate a film: { name, stars, text } (one per visitor, a new one replaces it)
+//   GET  /api/search?q=               films whose cast or crew match a name: { movies: [{ id, why }], people: [...] }
 //   GET  /api/people/:id              one person and every film they're credited on
 //   POST /api/messages                the feedback form: { name, email, topic, movieId, message }
 //
@@ -36,7 +37,7 @@ export function filmsJSON() {
 
 const ATTRIBUTION = {
   imdb: "Information courtesy of IMDb (https://www.imdb.com). Used with permission.",
-  tmdb: "This product uses the TMDB API but is not endorsed or certified by TMDB.",
+  tmdb: "This website uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.",
 };
 
 // A film is out once its release date (in India) arrives; without a date, "released" is a fallback
@@ -180,4 +181,37 @@ publicApi.put("/comments/:id/vote", limit(10, 300, "Too many likes from here. Wa
   const vote = req.body?.vote;
   if (![1, -1, 0].includes(vote)) return res.status(400).json({ error: "Send { vote: 1 } to like, -1 to dislike, 0 to take it back." });
   answer(res, voteComment(id, ensureVisitor(req, res), vote));
+});
+
+// ---------- Search by cast and crew ----------
+// The site's search box finds films by title, director, typed cast and language in the browser; this adds the
+// films credited to a person in the database: "pawan kalyan" -> every film he's in, billed leads first.
+const likeEscape = t => t.replace(/[\\%_]/g, c => `\\${c}`);
+publicApi.get("/search", limit(1, 120, "Too many searches. Wait a minute."), (req, res) => {
+  const words = String(req.query.q || "").toLowerCase().normalize("NFKD").replace(/\p{M}/gu, "")
+    .split(/[^a-z0-9]+/).filter(Boolean).slice(0, 5);
+  if (!words.length || words.join("").length < 2) return res.json({ movies: [], people: [] });
+  // Each word typed must start a word in the name: "thaman" finds S. Thaman, not Harish Uthaman
+  const where = words.map(() => "(lower(p.name) LIKE ? ESCAPE '\\' OR lower(p.name) LIKE ? ESCAPE '\\')").join(" AND ");
+  const args = words.flatMap(w => [`${likeEscape(w)}%`, `% ${likeEscape(w)}%`]);
+  const people = db.prepare(`
+    SELECT p.id, p.name, COUNT(DISTINCT c.movie_id) AS films FROM people p JOIN credits c ON c.person_id = p.id
+    WHERE ${where} GROUP BY p.id ORDER BY films DESC, p.name LIMIT 5
+  `).all(...args).map(p => ({ id: p.id, name: p.name, films: p.films }));
+  // Each film once, with the credit that matched: leads and directors first, then the rest, newest first
+  const rows = db.prepare(`
+    SELECT c.movie_id AS id, p.name, c.kind, c.job, c.character, c.position, m.year
+    FROM credits c JOIN people p ON p.id = c.person_id JOIN movies m ON m.id = c.movie_id
+    WHERE ${where}
+    ORDER BY (c.kind = 'cast' AND c.position < 8) DESC, (c.job = 'Director') DESC, m.year DESC, c.position
+    LIMIT 80
+  `).all(...args);
+  const seen = new Set(), movies = [];
+  for (const r of rows) {
+    if (seen.has(r.id)) continue;
+    seen.add(r.id);
+    movies.push({ id: r.id, why: r.kind === "cast" ? `Cast: ${r.name}${r.character ? ` as ${r.character.split(" / ")[0]}` : ""}` : `${r.job || "Crew"}: ${r.name}` });
+    if (movies.length >= 30) break;
+  }
+  res.json({ movies, people });
 });
