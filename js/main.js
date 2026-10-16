@@ -951,6 +951,8 @@ const due = takeDueReminders(MOVIES);
 if (due.length) toast(due.length === 1 ? `${due[0].title} is out now. See its first numbers.` : `${due.length} films you follow are out now.`);
 
 // ---------- How we track ----------
+// On the server, IMDb ratings come from IMDb every day and audience ratings are shared by everyone
+if (ONLINE) $("ratingsHow").textContent = "Critics' average out of 10, IMDb's rating (refreshed daily from IMDb) and star ratings from our visitors.";
 (function renderTrackStats() {
   const stats = [
     [trackedFilms.length, "Films tracked"],
@@ -1010,8 +1012,10 @@ function markInvalid(id, invalid) {
 }
 ["cName", "cMsg"].forEach(id => $(id).addEventListener("input", () => { if ($(id).value.trim()) markInvalid(id, false); }));
 
-$("contactForm").addEventListener("submit", e => {
+$("contactForm").addEventListener("submit", async e => {
   e.preventDefault();
+  const form = e.target, send = form.querySelector('[type="submit"]');
+  if (send?.disabled) return;
   const val = id => $(id).value.trim();
   const status = $("formMsg");
   const blanks = ["cName", "cMsg"].filter(id => !val(id));
@@ -1026,13 +1030,27 @@ $("contactForm").addEventListener("submit", e => {
   const message = { id: Date.now(), name: val("cName"), email: val("cEmail"), topic: val("cTopic") };
   if (movieId) message.movieId = movieId;
   Object.assign(message, { message: val("cMsg"), at: new Date().toISOString(), read: false });
-  const saved = saveStore("manaMessages", [message, ...loadStore("manaMessages", [])]);
+  // On the server the message goes to the database for the admin portal; without it, to this browser
+  let saved = false, problem = "Couldn't save your message. Your browser storage may be full or blocked.";
+  if (ONLINE) {
+    if (send) send.disabled = true;
+    status.classList.remove("error");
+    status.textContent = "Sending…";
+    try {
+      await api("messages", { method: "POST", body: { name: message.name, email: message.email, topic: message.topic, movieId: message.movieId ?? null, message: message.message } });
+      saved = true;
+    } catch (err) {
+      problem = err.message;
+    } finally {
+      if (send) send.disabled = false;
+    }
+  } else {
+    saved = saveStore("manaMessages", [message, ...loadStore("manaMessages", [])]);
+  }
   status.classList.toggle("error", !saved);
-  status.textContent = saved
-    ? "Thanks! Your message has been saved."
-    : "Couldn't save your message. Your browser storage may be full or blocked.";
+  status.textContent = saved ? (ONLINE ? "Thanks! Your message has been sent." : "Thanks! Your message has been saved.") : problem;
   if (saved) {
-    e.target.reset();
+    form.reset();
     setTopic("");
   }
 });

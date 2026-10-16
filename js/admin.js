@@ -1,22 +1,104 @@
-// MANA CINEMA admin portal: films, day-wise collections, ratings, feedback and backups.
-// Front-end demo: everything is stored in this browser's localStorage, and the
-// password check below is NOT real security (anyone can read this file).
-// Shared helpers (esc, loadStore, saveStore, posterHTML, crore, dayRows, verdict...) come from
+// MANA CINEMA admin portal: films, day-wise collections, ratings, feedback, backups and data syncs.
+// On the server (npm start, ONLINE in data.js) every change goes to the database through the admin API,
+// and the password is checked by the server (ADMIN_PASSWORD in .env).
+// Without a server (GitHub Pages, python http.server) it's the old front-end demo: everything is stored in
+// this browser's localStorage, and the demo password below is NOT real security (anyone can read this file).
+// Shared helpers (esc, loadStore, saveStore, api, posterHTML, crore, dayRows, verdict...) come from
 // data.js, ui.js and boxoffice.js, which load first. Don't redeclare their names here.
 
-const ADMIN_PASSWORD = "MANA-admin-2026"; // demo password, change it here
+const ADMIN_PASSWORD = "MANA-admin-2026"; // demo password for the browser-only version; the server uses .env
 
 const $ = id => document.getElementById(id);
 const MOVIES_KEY = "manaMovies";
 const MESSAGES_KEY = "manaMessages";
-const SAVE_FAILED = "Couldn't save. Browser storage may be full or blocked.";
+const SAVE_FAILED = ONLINE ? "Couldn't save. Check the server is running and try again." : "Couldn't save. Browser storage may be full or blocked.";
+
+// On the server: the films, reviews and messages loaded at sign-in, kept in step with every save
+const live = { movies: [], reviews: [], messages: [] };
+async function loadLive() {
+  const data = await api("admin/data");
+  live.movies = data.movies;
+  live.messages = data.messages;
+  setLiveReviews(data.reviews);
+}
+// boxoffice.js reads audience reviews from MANA_SERVER.reviews (the critics preview shows the audience score)
+function setLiveReviews(list) {
+  live.reviews = list;
+  MANA_SERVER.reviews = list;
+}
 
 // Fresh copies on every read: data.js reads MOVIES once per page load, and DEFAULT_MOVIES must never be edited in place
 const db = {
-  movies: () => structuredClone(loadStore(MOVIES_KEY, DEFAULT_MOVIES)),
-  peek: () => loadStore(MOVIES_KEY, DEFAULT_MOVIES),   // read-only (no copy): checks that run on every keystroke
-  reviews: () => allReviews(),
-  messages: () => loadStore(MESSAGES_KEY, []),
+  movies: () => structuredClone(ONLINE ? live.movies : loadStore(MOVIES_KEY, DEFAULT_MOVIES)),
+  peek: () => (ONLINE ? live.movies : loadStore(MOVIES_KEY, DEFAULT_MOVIES)),   // read-only (no copy): checks that run on every keystroke
+  reviews: () => (ONLINE ? live.reviews.slice() : allReviews()),
+  messages: () => (ONLINE ? live.messages.slice() : loadStore(MESSAGES_KEY, [])),
+};
+
+// ---------- Saving ----------
+// Each resolves to true once saved; on failure it shows why and resolves to false.
+// Offline they write the whole list to this browser's storage, as the portal always did.
+function saveFailed(err) {
+  if (err?.status === 401) {   // the sign-in expired: show the sign-in card, keep the page's state
+    $("app").hidden = true;
+    $("login").hidden = false;
+    $("loginError").textContent = "Your sign-in expired. Sign in again, then save once more.";
+    $("adminPass").focus();
+    return false;
+  }
+  toast(err?.message || SAVE_FAILED);
+  return false;
+}
+const save = {
+  // movies: the full list with this film in place (offline). Resolves to the film as stored, or null.
+  async film(film, movies) {
+    if (!ONLINE) return saveStore(MOVIES_KEY, movies) ? film : (toast(SAVE_FAILED), null);
+    try {
+      const { movie } = await api(`admin/movies/${film.id}`, { method: "PUT", body: film });
+      const i = live.movies.findIndex(m => m.id === movie.id);
+      if (i >= 0) live.movies[i] = movie; else live.movies.push(movie);
+      return movie;
+    } catch (err) { return saveFailed(err) || null; }
+  },
+  async deleteFilm(id, movies) {
+    if (!ONLINE) {
+      if (!saveStore(MOVIES_KEY, movies.filter(x => x.id !== id))) return saveFailed();
+      saveStore(REVIEWS_KEY, db.reviews().filter(r => r.movieId !== id));
+      return true;
+    }
+    try {
+      await api(`admin/movies/${id}`, { method: "DELETE" });
+      live.movies = live.movies.filter(m => m.id !== id);
+      setLiveReviews(live.reviews.filter(r => r.movieId !== id));
+      return true;
+    } catch (err) { return saveFailed(err); }
+  },
+  // patch { hidden } or null to delete; next: the whole list after the change (offline)
+  async review(r, patch, next) {
+    if (!ONLINE) return saveStore(REVIEWS_KEY, next) || saveFailed();
+    try {
+      if (patch) {
+        const { review } = await api(`admin/reviews/${r.id}`, { method: "PATCH", body: patch });
+        setLiveReviews(live.reviews.map(x => (x.id === review.id ? review : x)));
+      } else {
+        await api(`admin/reviews/${r.id}`, { method: "DELETE" });
+        setLiveReviews(live.reviews.filter(x => x.id !== r.id));
+      }
+      return true;
+    } catch (err) { return saveFailed(err); }
+  },
+  // action: "read" | "delete" | "read-all"; next: the whole list after the change (offline)
+  async message(action, id, next) {
+    if (!ONLINE) return saveStore(MESSAGES_KEY, next) || saveFailed();
+    try {
+      if (action === "read-all") await api("admin/messages/read-all", { method: "POST" });
+      else if (action === "read") await api(`admin/messages/${id}`, { method: "PATCH", body: { read: true } });
+      else await api(`admin/messages/${id}`, { method: "DELETE" });
+      live.messages = action === "delete" ? live.messages.filter(m => String(m.id) !== String(id))
+        : live.messages.map(m => (action === "read-all" || String(m.id) === String(id) ? { ...m, read: true } : m));
+      return true;
+    } catch (err) { return saveFailed(err); }
+  },
 };
 
 // ---------- Small helpers ----------
@@ -225,8 +307,34 @@ function showApp() {
   $("app").hidden = false;
   go(location.hash.slice(1) || "dashboard", { focus: false });
 }
-$("loginForm").addEventListener("submit", e => {
+$("loginForm").addEventListener("submit", async e => {
   e.preventDefault();
+  if (ONLINE) {
+    const btn = e.target.querySelector('[type="submit"]');
+    if (btn.disabled) return;
+    btn.disabled = true;
+    try {
+      await api("admin/login", { method: "POST", body: { password: $("adminPass").value } });
+      await loadLive();
+      $("adminPass").value = "";
+      $("loginError").textContent = "";
+      $("adminPass").removeAttribute("aria-invalid");
+      if (currentView) {   // signed in again after the session expired: back to where they were
+        $("login").hidden = true;
+        $("app").hidden = false;
+      } else {
+        showApp();
+      }
+      $("viewTitle").focus();
+    } catch (err) {
+      $("loginError").textContent = err.message;
+      $("adminPass").setAttribute("aria-invalid", "true");
+      $("adminPass").select();
+    } finally {
+      btn.disabled = false;
+    }
+    return;
+  }
   if ($("adminPass").value === ADMIN_PASSWORD) {
     try { sessionStorage.setItem("manaAdmin", "1"); } catch {}
     $("loginError").textContent = "";
@@ -240,8 +348,9 @@ $("loginForm").addEventListener("submit", e => {
   }
 });
 $("adminPass").addEventListener("input", () => $("adminPass").removeAttribute("aria-invalid"));
-function signOut() {
+async function signOut() {
   if (!canLeave()) return;
+  if (ONLINE) { try { await api("admin/logout", { method: "POST" }); } catch {} }
   try { sessionStorage.removeItem("manaAdmin"); } catch {}
   location.hash = "";
   location.reload();
@@ -254,7 +363,7 @@ const VIEWS = { dashboard: "Dashboard", films: "Films", collections: "Collection
 const OLD_VIEWS = { movies: "films" };   // links saved from the old portal
 const RENDER = {
   dashboard: renderDashboard, films: renderFilms, collections: renderCollections,
-  ratings: renderRatings, messages: renderMessages, settings: () => {},
+  ratings: renderRatings, messages: renderMessages, settings: renderSettings,
 };
 let currentView = null;
 
@@ -617,15 +726,15 @@ $("filmList").addEventListener("click", e => {
   if (del) deleteFilm(Number(del.dataset.delete));
 });
 
-function deleteFilm(id) {
+async function deleteFilm(id) {
   const movies = db.movies();
   const m = findFilm(movies, id);
   if (!m) return;
   const reviewCount = db.reviews().filter(r => r.movieId === m.id).length;
   const extra = reviewCount ? `, critics scores and ${plural(reviewCount, "audience review")}` : " and critics scores";
-  if (!confirm(`Delete "${m.title}"? Its collections${extra} go too. This can't be undone.`)) return;
-  if (!saveStore(MOVIES_KEY, movies.filter(x => x.id !== m.id))) return toast(SAVE_FAILED);
-  saveStore(REVIEWS_KEY, db.reviews().filter(r => r.movieId !== m.id));
+  const synced = ONLINE && (m.credits || m.trailer) ? ", cast and crew, trailer" : "";
+  if (!confirm(`Delete "${m.title}"? Its collections${synced}${extra} go too. This can't be undone.`)) return;
+  if (!(await save.deleteFilm(m.id, movies))) return;
   saveStore(REMINDERS_KEY, loadStore(REMINDERS_KEY, []).filter(x => x !== m.id));
   if (co.id === m.id) co.id = co.draft = null;
   if (rt.id === m.id) rt.id = rt.draft = null;
@@ -669,6 +778,10 @@ function openFilm(id = null) {
   set("fCast", m.cast);
   set("fDesc", m.desc);
   set("fImage", m.image);
+  set("fImdb", m.imdbId);
+  set("fTmdb", m.tmdbId);
+  set("fTrailer", m.trailer?.videoId ? `https://youtu.be/${m.trailer.videoId}` : "");
+  $("fImdbHint").textContent = IMDB_HOW[m.imdbId ? m.imdbSource || "admin" : ""] || "Or paste the IMDb link";
   $("fColor1").value = /^#[0-9a-f]{6}$/i.test(m.colors?.[0] || "") ? m.colors[0] : DEFAULT_COLORS[0];
   $("fColor2").value = /^#[0-9a-f]{6}$/i.test(m.colors?.[1] || "") ? m.colors[1] : DEFAULT_COLORS[1];
   syncFilmForm();
@@ -709,8 +822,36 @@ function formFilm() {
     year: release ? parseDay(release)?.getFullYear() : Number(v("fYear")) || undefined,
     duration: v("fDuration"), cert: $("fCert").value, director: v("fDirector"), cast: v("fCast"), desc: v("fDesc"),
     art: $("fArt").value, colors: [$("fColor1").value, $("fColor2").value], image: v("fImage"),
+    imdbId: imdbIdFrom(v("fImdb")), tmdbId: Number(tmdbIdFrom(v("fTmdb"))) || "",
+    trailer: youtubeIdFrom(v("fTrailer")) ? { videoId: youtubeIdFrom(v("fTrailer")) } : undefined,
   };
 }
+
+// IDs from what the admin pastes: a bare ID or the page's address
+// "https://www.imdb.com/title/tt12735488/" -> "tt12735488" (anything else is kept, so it can be flagged)
+const imdbIdFrom = text => /\btt\d{7,10}\b/.exec(text)?.[0] || text;
+// "https://www.themoviedb.org/movie/801688-kalki-2898-ad" -> "801688"
+const tmdbIdFrom = text => (/^\d{1,9}$/.test(text) ? text : /themoviedb\.org\/movie\/(\d{1,9})/.exec(text)?.[1] || (text ? "x" : ""));
+// youtu.be/ID, youtube.com/watch?v=ID, /shorts/ID, /embed/ID, /live/ID, or the 11-character ID itself
+function youtubeIdFrom(text) {
+  const s = String(text || "").trim();
+  if (/^[\w-]{11}$/.test(s)) return s;
+  try {
+    const u = new URL(/^https?:\/\//i.test(s) ? s : `https://${s}`);
+    const host = u.hostname.replace(/^(www|m)\./, "");
+    const id = host === "youtu.be" ? u.pathname.slice(1)
+      : /^(youtube\.com|youtube-nocookie\.com)$/.test(host) ? (u.searchParams.get("v") || /^\/(shorts|embed|live)\/([\w-]{11})/.exec(u.pathname)?.[2] || "") : "";
+    return /^[\w-]{11}$/.test(id) ? id : "";
+  } catch { return ""; }
+}
+// How a film's IMDb ID was found (shown under the field)
+const IMDB_HOW = {
+  admin: "Set here by you",
+  title: "Found by the IMDb sync (same title and year)",
+  fuzzy: "Found by the IMDb sync (close title)",
+  credits: "Found by the IMDb sync (cast and crew matched)",
+  tmdb: "Found through TMDB",
+};
 
 // Show the note/year fields only without a date, check the title and photo path, redraw the preview
 function syncFilmForm() {
@@ -729,6 +870,11 @@ function syncFilmForm() {
   const clash = db.peek().some(m => m.id !== editingId && String(m.title).trim().toLowerCase() === data.title.toLowerCase());
   $("fTitle").setCustomValidity(clash ? "Another film already has this title." : "");
   $("fImage").setCustomValidity(data.image && !posterImage(data) ? "Use a file like images/posters/name.jpg or an https link to a .jpg, .png or .webp." : "");
+  const imdbClash = data.imdbId && db.peek().find(m => m.id !== editingId && m.imdbId === data.imdbId);
+  $("fImdb").setCustomValidity(data.imdbId && !/^tt\d{7,10}$/.test(data.imdbId) ? "An IMDb ID looks like tt1234567. Copy it from the film's IMDb address."
+    : imdbClash ? `${imdbClash.title} already has this IMDb ID.` : "");
+  $("fTmdb").setCustomValidity($("fTmdb").value.trim() && !data.tmdbId ? "A TMDB ID is the number in the film's TMDB address." : "");
+  $("fTrailer").setCustomValidity($("fTrailer").value.trim() && !data.trailer ? "Paste a YouTube video link or its 11-character ID." : "");
   $("filmPreview").innerHTML = posterHTML({ ...data, title: data.title || "Preview" }, { compact: true });
   markPhotos($("filmPreview"));
 }
@@ -755,8 +901,10 @@ $("filmDialog").addEventListener("cancel", e => {
   closeFilmDialog();
 });
 
-$("filmForm").addEventListener("submit", e => {
+$("filmForm").addEventListener("submit", async e => {
   e.preventDefault();
+  const btn = e.target.querySelector('[type="submit"]');
+  if (btn.disabled) return;
   let movies = db.movies();
   const data = formFilm();
   let film;
@@ -769,9 +917,13 @@ $("filmForm").addEventListener("submit", e => {
     film = { ...data, id: Math.max(FIRST_ADMIN_ID - 1, ...movies.map(x => x.id)) + 1, critics: {}, boxOffice: {} };
   }
   // Empty optional fields are removed, not saved as ""
-  ["release", "releaseNote", "status", "year", "duration", "cert", "director", "cast", "image", "art"].forEach(k => { if (blank(film[k])) delete film[k]; });
+  ["release", "releaseNote", "status", "year", "duration", "cert", "director", "cast", "image", "art", "imdbId", "tmdbId", "trailer"].forEach(k => { if (blank(film[k])) delete film[k]; });
   movies = editingId !== null ? movies.map(x => (x.id === editingId ? film : x)) : [...movies, film];
-  if (!saveStore(MOVIES_KEY, movies)) return toast(SAVE_FAILED);
+  btn.disabled = true;
+  const stored = await save.film(film, movies);
+  btn.disabled = false;
+  if (!stored) return;
+  film = stored;
   $("filmDialog").close();
   showFilmCard(film);
   toast(`${film.title} saved`);
@@ -1284,8 +1436,9 @@ function renderSummary() {
   icons();
 }
 
-function saveCollections() {
-  if (!co.draft) return;
+let savingCollections = false;
+async function saveCollections() {
+  if (!co.draft || savingCollections) return;
   const errs = collectionErrors(co.draft.boxOffice);
   if (errs.length) {
     toast(`Fix ${plural(errs.length, "problem")} before saving`);
@@ -1296,7 +1449,10 @@ function saveCollections() {
   const m = findFilm(movies, co.id);
   if (!m) { toast("That film was deleted."); co.id = co.draft = null; return renderCollections(); }
   m.boxOffice = cleanBoxOffice(co.draft.boxOffice);
-  if (!saveStore(MOVIES_KEY, movies)) return toast(SAVE_FAILED);
+  savingCollections = true;
+  const stored = await save.film(m, movies);
+  savingCollections = false;
+  if (!stored) return;
   const fromSummary = Boolean(document.activeElement?.closest("#coSummary"));
   loadCollections(findFilm(db.movies(), co.id));   // read back exactly what was stored
   renderCoForm();
@@ -1497,8 +1653,10 @@ $("rtDiscard").addEventListener("click", () => {
   renderCritics();
   $("rtFilm").focus();
 });
-$("rtForm").addEventListener("submit", e => {
+$("rtForm").addEventListener("submit", async e => {
   e.preventDefault();
+  const btn = e.submitter || e.target.querySelector('[type="submit"]');
+  if (btn?.disabled) return;
   const errs = criticsErrors(rt.draft.critics);
   if (errs.length) {
     toast(`Fix ${plural(errs.length, "problem")} before saving`);
@@ -1508,7 +1666,10 @@ $("rtForm").addEventListener("submit", e => {
   const m = findFilm(movies, rt.id);
   if (!m) { toast("That film was deleted."); rt.id = rt.draft = null; return renderCritics(); }
   m.critics = cleanCritics(rt.draft.critics);
-  if (!saveStore(MOVIES_KEY, movies)) return toast(SAVE_FAILED);
+  if (btn) btn.disabled = true;
+  const stored = await save.film(m, movies);
+  if (btn) btn.disabled = false;
+  if (!stored) return;
   loadCritics(findFilm(db.movies(), rt.id));
   renderCritics();
   toast(`${m.title}: ratings saved`);
@@ -1568,7 +1729,7 @@ function renderReviews() {
 }
 $("rvFilm").addEventListener("change", e => { rvFilter = e.target.value; renderReviews(); });
 $("rvSearch").addEventListener("input", renderReviews);
-$("reviewTable").addEventListener("click", e => {
+$("reviewTable").addEventListener("click", async e => {
   const more = e.target.closest("[data-expand]");
   if (more) {
     const open = more.getAttribute("aria-expanded") !== "true";
@@ -1586,7 +1747,7 @@ $("reviewTable").addEventListener("click", e => {
   if (!r) return renderReviews();
   if (del && !confirm(`Delete ${r.name}'s review? This can't be undone.`)) return;
   const next = toggle ? list.map(x => (x === r ? { ...x, hidden: !x.hidden } : x)) : list.filter(x => x !== r);
-  if (!saveStore(REVIEWS_KEY, next)) return toast(SAVE_FAILED);
+  if (!(await save.review(r, toggle ? { hidden: !r.hidden } : null, next))) return;
   renderReviews();
   renderCriticsPreview();   // the audience score next to the critics changes too
   toast(toggle ? (r.hidden ? "Review visible again" : "Review hidden from the website") : "Review deleted");
@@ -1633,7 +1794,7 @@ function renderMessages() {
   updateBadge();
   icons();
 }
-$("messageList").addEventListener("click", e => {
+$("messageList").addEventListener("click", async e => {
   const r = e.target.closest("[data-read]");
   const d = e.target.closest("[data-del-msg]");
   if (!r && !d) return;
@@ -1644,13 +1805,13 @@ $("messageList").addEventListener("click", e => {
     if (!msg || !confirm(`Delete the message from ${msg.name || "Anonymous"}? This can't be undone.`)) return;
     list = list.filter(m => m !== msg);
   }
-  if (!saveStore(MESSAGES_KEY, list)) return toast(SAVE_FAILED);
+  if (!(await save.message(r ? "read" : "delete", r ? r.dataset.read : d.dataset.delMsg, list))) return;
   renderMessages();
   toast(r ? "Marked as read" : "Message deleted");
   ($("markAllRead").disabled ? $("viewTitle") : $("markAllRead")).focus();
 });
-$("markAllRead").addEventListener("click", () => {
-  if (!saveStore(MESSAGES_KEY, db.messages().map(m => ({ ...m, read: true })))) return toast(SAVE_FAILED);
+$("markAllRead").addEventListener("click", async () => {
+  if (!(await save.message("read-all", null, db.messages().map(m => ({ ...m, read: true }))))) return;
   renderMessages();
   toast("All messages marked as read");
   $("viewTitle").focus();
@@ -1687,26 +1848,28 @@ function backupProblem(d) {
   return "";
 }
 
-$("restoreFile").addEventListener("change", async e => {
-  const file = e.target.files[0];
-  e.target.value = "";   // so the same file can be picked again
-  // Problems show in red; "cancelled" is just information
-  const say = (text, isError = true) => {
-    $("restoreMsg").textContent = text;
-    $("restoreMsg").classList.toggle("is-info", !isError);
-  };
-  say("");
-  if (!file) return;
-  let data;
-  try { data = JSON.parse(await file.text()); } catch { return say("That file isn't a valid backup (it can't be read as JSON)."); }
+// Restores a backup (a file, or the data this browser saved before the server) once the admin confirms.
+// On the server it replaces the database's films, reviews and messages in one go; syncs' finds are kept.
+async function restoreData(data, { from, say }) {
   const problem = backupProblem(data);
   if (problem) return say(problem);
   const made = new Date(data.exportedAt);
-  const when = Number.isNaN(made.getTime()) ? "" : ` made on ${fmtTime(made)}`;
+  const when = data.exportedAt && !Number.isNaN(made.getTime()) ? ` made on ${fmtTime(made)}` : "";
   // A backup made before the all-India catalogue has no catalog number and none of films 1001+
   const older = !(Number(data.catalog) >= CATALOG_VERSION);
   const added = older ? " Films added to the site's catalogue since this backup was made are added back." : "";
-  if (!confirm(`Restore ${plural(data.movies.length, "film")}, ${plural(data.reviews.length, "audience review")} and ${plural(data.messages.length, "message")} from the backup${when}?\n\nThis replaces the films, reviews and messages in this browser.${added}`)) return say("Restore cancelled. Nothing changed.", false);
+  const kept = ONLINE ? " IMDb IDs, IMDb ratings, cast and crew, and trailers found by the syncs are kept for films the backup doesn't set them for." : "";
+  if (!confirm(`Restore ${plural(data.movies.length, "film")}, ${plural(data.reviews.length, "audience review")} and ${plural(data.messages.length, "message")} from ${from}${when}?\n\nThis replaces the films, reviews and messages ${ONLINE ? "in the database" : "in this browser"}.${added}${kept}`)) return say("Restore cancelled. Nothing changed.", false);
+  if (ONLINE) {
+    say("Restoring…", false);
+    try {
+      await api("admin/restore", { method: "POST", body: data });
+    } catch (err) {
+      return say(err.status === 401 ? "Your sign-in expired. Sign in again, then restore once more." : `Couldn't restore: ${err.message} Nothing was changed.`);
+    }
+    co.draft = rt.draft = null;   // nothing left to guard; the page reloads with the restored data
+    return location.reload();
+  }
   // All three keys or none: if a write fails, put back what was there, newest write first
   const keys = [MOVIES_KEY, REVIEWS_KEY, MESSAGES_KEY];
   let before;
@@ -1720,24 +1883,156 @@ $("restoreFile").addEventListener("change", async e => {
   // data.js adds the newer catalogue's films on the reload unless the backup already had them
   // (films the admin deleted in a newer backup stay deleted)
   try { older ? localStorage.removeItem("manaCatalog") : localStorage.setItem("manaCatalog", String(Number(data.catalog))); } catch {}
-  co.draft = rt.draft = null;   // nothing left to guard; the page reloads with the restored data
+  co.draft = rt.draft = null;
   location.reload();
+}
+
+// Problems show in red; "cancelled" is just information
+function restoreSay(text, isError = true) {
+  $("restoreMsg").textContent = text;
+  $("restoreMsg").classList.toggle("is-info", !isError);
+}
+$("restoreFile").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  e.target.value = "";   // so the same file can be picked again
+  restoreSay("");
+  if (!file) return;
+  let data;
+  try { data = JSON.parse(await file.text()); } catch { return restoreSay("That file isn't a valid backup (it can't be read as JSON)."); }
+  restoreData(data, { from: "the backup", say: restoreSay });
+});
+
+// Data the browser-only version saved in this browser (admin edits, reviews posted here, messages), to move
+// into the database once. Null when there is none.
+function browserData() {
+  let saved = false;
+  try { saved = [MOVIES_KEY, REVIEWS_KEY, MESSAGES_KEY].some(k => localStorage.getItem(k) !== null); } catch {}
+  if (!saved) return null;
+  let catalog = 0;
+  try { catalog = Number(localStorage.getItem("manaCatalog")) || 0; } catch {}
+  return {
+    app: "mana-cinema", version: DATA_VERSION, catalog, exportedAt: null,
+    movies: loadStore(MOVIES_KEY, DEFAULT_MOVIES), reviews: loadStore(REVIEWS_KEY, []), messages: loadStore(MESSAGES_KEY, []),
+  };
+}
+$("importBrowser").addEventListener("click", () => {
+  const data = browserData();
+  if (!data) return restoreSay("This browser has no saved data to move.", false);
+  restoreData(data, { from: "this browser's saved data", say: restoreSay });
 });
 
 const RESETS = {
   films: { key: MOVIES_KEY, ask: "Restore the original films and collections? Films you added and every edit you made are removed.", done: "Original films and collections restored" },
-  reviews: { key: REVIEWS_KEY, ask: "Delete all audience reviews stored in this browser?", done: "All audience reviews deleted" },
+  reviews: { key: REVIEWS_KEY, ask: ONLINE ? "Delete every audience review in the database?" : "Delete all audience reviews stored in this browser?", done: "All audience reviews deleted" },
   messages: { key: MESSAGES_KEY, ask: "Delete all messages?", done: "All messages deleted" },
 };
-document.querySelectorAll("[data-reset]").forEach(btn => btn.addEventListener("click", () => {
+document.querySelectorAll("[data-reset]").forEach(btn => btn.addEventListener("click", async () => {
   const r = RESETS[btn.dataset.reset];
   if (!confirm(`${r.ask} This can't be undone.`)) return;
-  try { localStorage.removeItem(r.key); } catch { return toast(SAVE_FAILED); }
+  if (ONLINE) {
+    try {
+      await api(`admin/reset/${btn.dataset.reset}`, { method: "POST" });
+      await loadLive();
+    } catch (err) { return saveFailed(err); }
+  } else {
+    try { localStorage.removeItem(r.key); } catch { return toast(SAVE_FAILED); }
+  }
   if (r.key === MOVIES_KEY) co.id = co.draft = rt.id = rt.draft = null;
   updateBadge();
   toast(r.done);
 }));
 
+// ---------- Settings: IMDb, TMDB and YouTube syncs (server only) ----------
+// The server pulls IMDb ratings, cast and crew, and trailers into the database, one task at a time.
+// While a sync runs this panel checks on it every 2 seconds; when it ends, the films are reloaded.
+const BIG_SYNCS = { match: "about 230 MB", credits: "about 1.1 GB", all: "up to 1.3 GB" };
+let syncTimer = null, syncWatching = false;
+
+function renderSettings() {
+  document.querySelectorAll("[data-online]").forEach(el => { el.hidden = !ONLINE; });
+  document.querySelectorAll("[data-offline]").forEach(el => { el.hidden = ONLINE; });
+  $("importPanel").hidden = !(ONLINE && browserData());
+  renderSync();
+}
+
+async function renderSync() {
+  if (!ONLINE) return;
+  clearTimeout(syncTimer);
+  let st;
+  try { st = await api("admin/sync"); } catch (err) {
+    if (err.status === 401) return saveFailed(err);
+    $("syncState").textContent = err.message;
+    syncTimer = setTimeout(renderSync, 5000);
+    return;
+  }
+  const running = Boolean(st.job && !st.job.done);
+  const s = st.stats;
+  $("syncStats").innerHTML = [
+    [s.imdbIds, `of ${s.films} films matched to IMDb`], [s.imdbRatings, "IMDb ratings"],
+    [s.withCredits, "films with cast and crew"], [s.people, "people"], [s.trailers, "trailers"],
+  ].map(([n, label]) => `<li><strong>${Number(n).toLocaleString("en-IN")}</strong> ${label}</li>`).join("");
+  $("syncList").innerHTML = st.tasks.map(t => `
+    <li class="sync-task">
+      <div class="sync-task-info">
+        <p class="sync-task-name">${esc(t.label)} <span class="chip">${esc(t.source)}</span></p>
+        <p class="muted">${esc(t.about)}</p>
+        ${!t.keySet ? `<p class="sync-last">Needs ${esc(t.key)} in the server's .env file, then a restart.</p>`
+          : t.lastRun ? `<p class="sync-last${t.lastRun.ok ? "" : " is-error"}">${t.lastRun.ok ? "Last run" : "Failed"} ${esc(fmtTime(t.lastRun.finishedAt))}: ${esc(t.lastRun.summary)}</p>`
+          : `<p class="sync-last">Not run yet.</p>`}
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" data-sync="${esc(t.id)}"${running || !t.keySet ? " disabled" : ""}><i data-lucide="refresh-cw"></i> Run<span class="sr-only"> ${esc(t.label)}</span></button>
+    </li>`).join("");
+  $("syncAll").disabled = running;
+  const log = st.job?.log || [];
+  $("syncLog").hidden = !log.length;
+  $("syncLog").textContent = log.join("\n");
+  $("syncLog").scrollTop = $("syncLog").scrollHeight;
+  $("syncState").textContent = running ? `Running since ${fmtTime(st.job.startedAt)}…`
+    : st.job ? (st.job.ok ? `Finished ${fmtTime(st.job.finishedAt)}.` : "The last sync had a problem: see the log below.") : "";
+  icons();
+  if (running) {
+    syncWatching = true;
+    syncTimer = setTimeout(renderSync, 2000);
+  } else if (syncWatching) {
+    syncWatching = false;
+    try { await loadLive(); toast("Sync finished. The films are up to date."); } catch {}
+  }
+}
+
+async function runSync(task) {
+  const size = BIG_SYNCS[task];
+  if (size && !confirm(`This makes the server download ${size} of IMDb's data files. It takes a few minutes and the site keeps working meanwhile. Start?`)) return;
+  try {
+    await api("admin/sync", { method: "POST", body: { tasks: [task] } });
+  } catch (err) { return saveFailed(err); }
+  syncWatching = true;
+  toast("Sync started");
+  renderSync();
+}
+$("syncList").addEventListener("click", e => {
+  const btn = e.target.closest("[data-sync]");
+  if (btn && !btn.disabled) runSync(btn.dataset.sync);
+});
+$("syncAll").addEventListener("click", () => runSync("all"));
+
 // ---------- Start ----------
-if (signedIn()) showApp();
-else $("adminPass").focus();
+// On the server the session cookie says whether the admin is signed in; the browser-only demo uses sessionStorage
+(async function start() {
+  if (!ONLINE) {
+    if (signedIn()) showApp();
+    else $("adminPass").focus();
+    return;
+  }
+  document.querySelector(".login-card .muted").textContent = "Sign in with the admin password from the server's .env file.";
+  try {
+    const session = await api("admin/session");
+    if (!session.passwordSet) $("loginError").textContent = "Admin sign-in is off. Set ADMIN_PASSWORD in the server's .env file, then restart the server.";
+    if (session.signedIn) {
+      await loadLive();
+      return showApp();
+    }
+  } catch (err) {
+    $("loginError").textContent = err.message;
+  }
+  $("adminPass").focus();
+})();

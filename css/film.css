@@ -125,6 +125,31 @@ section.film-section { padding: 0; margin-top: 56px; }
 }
 .cast-name { max-width: 100%; color: var(--text); font-size: .8125rem; font-weight: 500; line-height: 1.35; overflow-wrap: break-word; }
 .cast-role { margin-top: 2px; color: var(--muted); font-size: var(--fs-label); font-weight: 500; line-height: 1.35; }
+/* Full cast & crew from the database: a closed panel, cast then each department */
+.credits-full { margin-top: 28px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.credits-full summary {
+  display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 20px;
+  border-radius: var(--radius-lg); cursor: pointer; list-style: none; font-size: var(--fs-ui); font-weight: 600;
+}
+.credits-full summary small { margin-left: auto; color: var(--muted); font-size: var(--fs-label); font-weight: 500; }
+.credits-full summary::-webkit-details-marker { display: none; }
+.credits-full summary::after {
+  content: ""; flex: 0 0 auto; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+  rotate: 45deg; translate: 0 -2px; transition: rotate .2s, border-color .2s;
+}
+.credits-full summary:hover::after { border-color: var(--text); }
+.credits-full[open] summary::after { rotate: 225deg; translate: 0 2px; }
+.credits-cols { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 24px 32px; padding: 20px; border-top: 1px solid var(--border); }
+.credit-group h3 { margin-bottom: 10px; font-size: var(--fs-small); font-weight: 700; line-height: 1.4; }
+.people-list { list-style: none; display: grid; gap: 8px; }
+.people-list li { display: flex; flex-direction: column; min-width: 0; font-size: var(--fs-small); line-height: 1.45; overflow-wrap: anywhere; }
+.people-name { color: var(--text); font-weight: 500; }
+.people-name a { color: inherit; text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 3px; }
+.people-name a:hover { text-decoration-color: var(--gold); }
+.people-role { color: var(--muted); font-size: var(--fs-label); }
+.credits-source { margin-top: 12px; }
+/* Trailer views under the film's buttons */
+.film-trailer { margin-top: 12px; color: var(--muted); font-size: var(--fs-label); font-weight: 500; line-height: 1.5; }
 
 /* ---------- Key numbers ---------- */
 .stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }

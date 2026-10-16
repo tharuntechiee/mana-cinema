@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css?v=7">
-  <link rel="stylesheet" href="css/admin.css?v=4">
+  <link rel="stylesheet" href="css/admin.css?v=5">
 </head>
 <body class="admin-page">
 
@@ -286,15 +286,34 @@
       <section class="admin-view" id="view-settings" aria-labelledby="viewTitle" hidden>
         <div class="admin-cols">
           <div>
+            <div class="panel" data-online hidden>
+              <div class="panel-title"><h2><i data-lucide="refresh-cw"></i>IMDb, TMDB and YouTube</h2></div>
+              <p class="muted panel-copy">The server pulls IMDb ratings, cast and crew, and trailers into the database. IMDb ratings refresh by themselves once a day. Films you give an IMDb ID or trailer in the film form keep yours.</p>
+              <ul class="sync-stats" id="syncStats"></ul>
+              <ul class="sync-list" id="syncList"></ul>
+              <div class="settings-actions">
+                <button type="button" class="btn btn-ghost btn-sm" id="syncAll"><i data-lucide="refresh-cw"></i> Run everything</button>
+                <p class="muted sync-state" id="syncState" role="status"></p>
+              </div>
+              <pre class="sync-log" id="syncLog" hidden></pre>
+            </div>
             <div class="panel">
               <div class="panel-title"><h2><i data-lucide="hard-drive-download"></i>Backup and restore</h2></div>
-              <p class="muted panel-copy">Everything lives in this browser. Download a backup to keep a copy or to move your films, audience reviews and messages to another browser.</p>
+              <p class="muted panel-copy" data-offline>Everything lives in this browser. Download a backup to keep a copy or to move your films, audience reviews and messages to another browser.</p>
+              <p class="muted panel-copy" data-online hidden>Everything lives in the server's database. Download a backup to keep a copy of the films, audience reviews and messages, or to move them to another server.</p>
               <div class="settings-actions">
                 <button type="button" class="btn btn-ghost btn-sm" id="backupBtn"><i data-lucide="download"></i> Download backup (JSON)</button>
                 <label class="btn btn-ghost btn-sm file-btn"><i data-lucide="upload"></i> Restore from backup
                   <input type="file" id="restoreFile" accept=".json,application/json" class="sr-only"></label>
               </div>
               <p class="restore-msg" id="restoreMsg" role="alert"></p>
+            </div>
+            <div class="panel" id="importPanel" hidden>
+              <div class="panel-title"><h2><i data-lucide="import"></i>Data saved in this browser</h2></div>
+              <p class="muted panel-copy">Before the server, the portal saved edits, reviews and messages in this browser. Move them into the database to keep them. This replaces the database's films, reviews and messages, so download a backup first.</p>
+              <div class="settings-actions">
+                <button type="button" class="btn btn-ghost btn-sm" id="importBrowser"><i data-lucide="database"></i> Move this browser's data to the database</button>
+              </div>
             </div>
             <div class="panel">
               <div class="panel-title"><h2><i data-lucide="rotate-ccw"></i>Reset data</h2></div>
@@ -308,11 +327,20 @@
           </div>
           <div class="panel">
             <div class="panel-title"><h2><i data-lucide="info"></i>About this portal</h2></div>
-            <ul class="about-list">
+            <ul class="about-list" data-offline>
               <li>This is a front-end demo. Films, collections and ratings are saved in this browser's storage, not on a server.</li>
               <li>The sign-in only keeps casual visitors out. It isn't real security: anyone can read the password in the page's code.</li>
               <li>Audience ratings exist only in the browser where they were posted, so other visitors and devices don't see them.</li>
-              <li>To share data between browsers, use backup and restore, or connect a real backend and database.</li>
+              <li>To share data between browsers, use backup and restore, or run the site on its server (npm start).</li>
+              <li>Collections are trade estimates (mostly Sacnilk, India net). Keep each film's sources and as-of date up to date.</li>
+              <li>Films in the language lists often have totals only: no day-wise figures, story line or critics. Needs attention doesn't flag those gaps; it only asks for day-wise figures on releases from the last 60 days.</li>
+            </ul>
+            <ul class="about-list" data-online hidden>
+              <li>Films, collections, ratings, audience reviews and messages are saved in the server's SQLite database, so every visitor and device sees the same data.</li>
+              <li>The server checks the admin password (ADMIN_PASSWORD in its .env file). A sign-in lasts 12 hours.</li>
+              <li>IMDb ratings and principal cast and crew come from IMDb's official datasets, for personal and non-commercial use. The site credits IMDb wherever they appear.</li>
+              <li>With a TMDB key, cast and crew come from TMDB instead: every actor and the whole crew. With a YouTube key, the sync finds each film's trailer and keeps its views up to date.</li>
+              <li>An IMDb rating you type in Ratings is replaced at the next daily IMDb refresh, for films with an IMDb ID.</li>
               <li>Collections are trade estimates (mostly Sacnilk, India net). Keep each film's sources and as-of date up to date.</li>
               <li>Films in the language lists often have totals only: no day-wise figures, story line or critics. Needs attention doesn't flag those gaps; it only asks for day-wise figures on releases from the last 60 days.</li>
             </ul>
@@ -357,6 +385,11 @@
           <div class="field"><label for="fDirector">Director</label><input id="fDirector" maxlength="80"></div>
           <div class="field"><label for="fCast">Starring</label><input id="fCast" maxlength="160" placeholder="Hero, Heroine, Villain"></div>
         </div>
+        <div class="form-row three">
+          <div class="field"><label for="fImdb">IMDb ID</label><input id="fImdb" maxlength="80" placeholder="tt1234567" spellcheck="false" aria-describedby="fImdbHint"><small class="field-hint" id="fImdbHint">Or paste the IMDb link</small></div>
+          <div class="field"><label for="fTmdb">TMDB ID</label><input id="fTmdb" maxlength="80" inputmode="numeric" placeholder="123456" spellcheck="false" aria-describedby="fTmdbHint"><small class="field-hint" id="fTmdbHint">Or paste the TMDB link</small></div>
+          <div class="field"><label for="fTrailer">YouTube trailer</label><input id="fTrailer" maxlength="120" placeholder="https://youtu.be/…" spellcheck="false" aria-describedby="fTrailerHint"><small class="field-hint" id="fTrailerHint">Link or video ID</small></div>
+        </div>
         <div class="field"><label for="fDesc">Story line</label><textarea id="fDesc" rows="3" maxlength="400" aria-describedby="fDescHint"></textarea><small class="field-hint" id="fDescHint">Optional. Films in the language lists usually have none.</small></div>
         <div class="form-row three">
           <div class="field"><label for="fColor1">Poster colour 1</label><input id="fColor1" type="color" value="#d63bff"></div>
@@ -372,12 +405,13 @@
     </form>
   </dialog>
 
+  <script src="api/bootstrap.js"></script>
   <script src="js/films-india.js?v=4"></script>
-  <script src="js/data.js?v=4"></script>
+  <script src="js/data.js?v=5"></script>
   <script src="js/art.js?v=5"></script>
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" integrity="sha384-ieG+IKD0d/ZPXyCBTMVAbqsQdns8QGJR/e26WMw7M4fkaI/rHcS/YIoi+ah9WGge" crossorigin="anonymous"></script>
   <script src="js/ui.js?v=4"></script>
-  <script src="js/boxoffice.js?v=4"></script>
-  <script src="js/admin.js?v=4"></script>
+  <script src="js/boxoffice.js?v=5"></script>
+  <script src="js/admin.js?v=5"></script>
 </body>
 </html>

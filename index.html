@@ -194,7 +194,7 @@
           <div class="feature reveal"><div class="feature-icon"><i data-lucide="calendar-range"></i></div><dt>Opening weekend</dt><dd>Release day to the first Sunday, so a Thursday release gets a 4-day weekend. Monday and Tuesday releases aren't ranked on it; compare them on First 7 days.</dd></div>
           <div class="feature reveal"><div class="feature-icon"><i data-lucide="calendar-days"></i></div><dt>Trade week</dt><dd>Friday to Thursday. A Thursday release has an 8-day first week.</dd></div>
           <div class="feature reveal"><div class="feature-icon"><i data-lucide="gavel"></i></div><dt>Verdict</dt><dd>The trade's call on how a film did against its cost, from Disaster to All-Time Blockbuster.</dd></div>
-          <div class="feature reveal"><div class="feature-icon"><i data-lucide="star"></i></div><dt>Ratings</dt><dd>Critics' average out of 10, an IMDb snapshot, and audience stars saved in this browser.</dd></div>
+          <div class="feature reveal"><div class="feature-icon"><i data-lucide="star"></i></div><dt>Ratings</dt><dd id="ratingsHow">Critics' average out of 10, an IMDb snapshot, and audience stars saved in this browser.</dd></div>
         </dl>
       </div>
     </section>
@@ -291,13 +291,15 @@
     </div>
   </footer>
 
+  <!-- On the server (npm start) this sets MANA_SERVER: the films and reviews from the database. Elsewhere it is missing, and the pages use the built-in catalogue. -->
+  <script src="api/bootstrap.js"></script>
   <script src="js/films-india.js?v=4"></script>
-  <script src="js/data.js?v=4"></script>
+  <script src="js/data.js?v=5"></script>
   <script src="js/art.js?v=5"></script>
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" integrity="sha384-ieG+IKD0d/ZPXyCBTMVAbqsQdns8QGJR/e26WMw7M4fkaI/rHcS/YIoi+ah9WGge" crossorigin="anonymous"></script>
   <script src="js/ui.js?v=4"></script>
-  <script src="js/boxoffice.js?v=4"></script>
+  <script src="js/boxoffice.js?v=5"></script>
   <script src="js/cover-stars.js?v=7"></script>
-  <script src="js/main.js?v=7"></script>
+  <script src="js/main.js?v=8"></script>
 </body>
 </html>

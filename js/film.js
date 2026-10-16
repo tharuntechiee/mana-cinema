@@ -15,10 +15,14 @@ const isoLabel = iso => dayLabel(iso);
 const icon = name => `<i data-lucide="${name}"></i>`;
 const plural = (n, one, many = one + "s") => `${n.toLocaleString("en-IN")} ${n === 1 ? one : many}`;
 const crWhole = v => croreRange(v, v);                       // "₹308 Cr", for round headline figures
+const compactCount = n => new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(n);   // 12345678 -> "12.3M"
 const trendClass = x => (x > 0 ? "up" : x < 0 ? "down" : "");
 const NOT_REPORTED = `<span class="not-reported">Not reported</span>`;
 const DASH = `<span class="muted">–</span>`;
 const NEW_TAB = `<span class="sr-only"> (opens in a new tab)</span>`;
+// Credits IMDb's and TMDB's terms ask for wherever their data is shown
+const IMDB_CREDIT = `Information courtesy of IMDb (<a class="text-link" href="https://www.imdb.com" target="_blank" rel="noopener">imdb.com</a>). Used with permission.`;
+const TMDB_CREDIT = `This product uses the TMDB API but is not endorsed or certified by <a class="text-link" href="https://www.themoviedb.org" target="_blank" rel="noopener">TMDB</a>.`;
 
 // Only plain web links become clickable; anything else stays text
 function safeUrl(u) {
@@ -188,6 +192,12 @@ function renderHeader(jumps, { hasNumbers = false } = {}) {
     ctas = `<button type="button" class="btn btn-primary remind-btn" id="remindBtn" aria-pressed="${on}"
               title="Saved in this browser. We'll show a note on this site when it releases.">${reminderLabel(on)}</button>${collectionsLink("btn-ghost")}`;
   }
+  // The trailer on YouTube (found by the server's sync or set in the admin portal), with its views
+  const trailer = m.trailer && /^[\w-]{11}$/.test(m.trailer.videoId || "") ? m.trailer : null;
+  if (trailer) ctas += `<a class="btn btn-ghost" href="https://www.youtube.com/watch?v=${trailer.videoId}" target="_blank" rel="noopener">${icon("play")} Trailer${NEW_TAB}</a>`;
+  const trailerStats = trailer && Number.isFinite(trailer.views)
+    ? `<p class="film-trailer">Trailer: ${compactCount(trailer.views)} views${Number.isFinite(trailer.likes) ? ` · ${compactCount(trailer.likes)} likes` : ""} on YouTube${trailer.asOf ? ` · as of ${esc(isoLabel(trailer.asOf) || trailer.asOf)}` : ""}</p>`
+    : "";
 
   $("filmHead").innerHTML = `
     <div class="film-head-info">
@@ -199,6 +209,7 @@ function renderHeader(jumps, { hasNumbers = false } = {}) {
       ${verdictRow}
       ${rankChips(m)}
       <div class="film-ctas">${ctas}</div>
+      ${trailerStats}
     </div>
     <div class="film-head-poster">${filmPoster(m)}</div>`;
 
@@ -218,8 +229,63 @@ function renderHeader(jumps, { hasNumbers = false } = {}) {
 }
 
 // ---------- Cast & crew ----------
-// Round avatars with initials (no photos): the director, then up to six names from the cast list
+// Round avatars with initials (no photos). First the director and up to six names typed in the admin portal;
+// on the server, the cast and crew saved in the database (IMDb's principal cast and crew, or TMDB's full
+// list) then replace them, with a "Full cast & crew" list by department. TMDB photos are stored, not shown.
 const CAST_MAX = 6;
+const TOP_BILLED = 12;
+const DEPARTMENTS = ["Directing", "Writing", "Production", "Sound", "Camera", "Editing", "Art", "Costume & Make-Up", "Visual Effects", "Lighting", "Crew"];
+const DEPARTMENT_LABELS = { Sound: "Music & sound", "Costume & Make-Up": "Costume & make-up", "Visual Effects": "Visual effects" };
+// Within a department, the head of it first: Director, Screenplay, Music, Director of Photography, Editor, Producer
+const LEAD_JOB = /^(director|screenplay|writer|story|music|original music composer|director of photography|cinematography|editor|producer)$/i;
+
+function personHTML(p) {
+  return `
+    <li class="cast-person">
+      <span class="cast-avatar" aria-hidden="true">${esc(initials(p.name))}</span>
+      <span class="cast-name">${esc(p.name)}</span>
+      ${p.role ? `<span class="cast-role">${esc(p.role)}</span>` : ""}
+    </li>`;
+}
+
+function personLink(p) {
+  const url = /^nm\d+$/.test(p.imdbId || "") ? `https://www.imdb.com/name/${p.imdbId}/`
+    : Number.isInteger(p.tmdbId) ? `https://www.themoviedb.org/person/${p.tmdbId}` : "";
+  return url ? `<a href="${url}" target="_blank" rel="noopener">${esc(p.name)}${NEW_TAB}</a>` : esc(p.name);
+}
+
+async function loadCredits(sec) {
+  let data = null;
+  try { data = await api(`movies/${Number(film.id)}/credits`); } catch {}
+  const cast = data?.cast || [], crew = data?.crew || [];
+  if (!cast.length && !crew.length) {   // the typed names stay; with none, the section goes
+    if (!sec.querySelector(".cast-row")) sec.hidden = true;
+    return;
+  }
+  const directors = crew.filter(c => /^director$/i.test(c.job));
+  const top = [...directors.map(d => ({ name: d.name, role: "Director" })), ...cast.slice(0, TOP_BILLED).map(c => ({ name: c.name, role: c.character }))];
+  const known = new Set(DEPARTMENTS);
+  const groups = DEPARTMENTS
+    .map(dep => [dep, crew.filter(c => (known.has(c.department) ? c.department : "Crew") === dep)
+      .sort((a, b) => Number(!LEAD_JOB.test(a.job)) - Number(!LEAD_JOB.test(b.job)))])
+    .filter(([, list]) => list.length);
+  const row = (p, role) => `<li><span class="people-name">${personLink(p)}</span>${role ? `<span class="people-role">${esc(role)}</span>` : ""}</li>`;
+  sec.innerHTML = `
+    <div class="container">
+      ${sectionHead("castTitle", "Cast &amp; crew")}
+      <ul class="cast-row">${top.map(personHTML).join("")}</ul>
+      <details class="credits-full">
+        <summary><span>Full cast &amp; crew</span><small>${plural(cast.length, "actor")} · ${plural(crew.length, "crew credit")}</small></summary>
+        <div class="credits-cols">
+          ${cast.length ? `<div class="credit-group"><h3>Cast</h3><ul class="people-list">${cast.map(c => row(c, c.character)).join("")}</ul></div>` : ""}
+          ${groups.map(([dep, list]) => `
+            <div class="credit-group"><h3>${esc(DEPARTMENT_LABELS[dep] || dep)}</h3>
+              <ul class="people-list">${list.map(c => row(c, c.job)).join("")}</ul></div>`).join("")}
+        </div>
+      </details>
+      <p class="fine-print credits-source">${data.source === "tmdb" ? `Full cast and crew from TMDB. ${TMDB_CREDIT}` : `Principal cast and crew from IMDb. ${IMDB_CREDIT}`}</p>
+    </div>`;
+}
 
 // "N. T. Rama Rao Jr." -> "NR", "Nagarjuna" -> "N"
 function initials(name) {
@@ -234,20 +300,15 @@ function renderCast() {
     film.director && { name: String(film.director).trim(), role: "Director" },
     ...String(film.cast || "").split(",").map(s => s.trim()).filter(Boolean).slice(0, CAST_MAX).map(name => ({ name, role: "" })),
   ].filter(p => p && p.name);
-  if (!people.length) { sec.hidden = true; return false; }
+  const stored = ONLINE && Boolean(film.credits?.cast || film.credits?.crew);
+  if (!people.length && !stored) { sec.hidden = true; return false; }
   sec.innerHTML = `
     <div class="container">
       ${sectionHead("castTitle", "Cast &amp; crew")}
-      <ul class="cast-row">
-        ${people.map(p => `
-          <li class="cast-person">
-            <span class="cast-avatar" aria-hidden="true">${esc(initials(p.name))}</span>
-            <span class="cast-name">${esc(p.name)}</span>
-            ${p.role ? `<span class="cast-role">${p.role}</span>` : ""}
-          </li>`).join("")}
-      </ul>
+      ${people.length ? `<ul class="cast-row">${people.map(personHTML).join("")}</ul>` : `<p class="muted">Loading cast and crew…</p>`}
     </div>`;
   sec.hidden = false;
+  if (stored) loadCredits(sec);
   return true;
 }
 
@@ -938,12 +999,16 @@ function renderRatings() {
       </ul>`
     : `<p class="rating-none">No critic reviews added yet.</p>`;
 
+  // From IMDb's own data (the server refreshes it daily), or a snapshot our team typed in
+  const fromImdb = film.critics?.imdb?.source === "imdb";
+  const imdbLink = /^tt\d{7,10}$/.test(film.imdbId || "")
+    ? ` <a class="text-link" href="https://www.imdb.com/title/${film.imdbId}/" target="_blank" rel="noopener">View on IMDb${NEW_TAB}</a>` : "";
   const imdbCard = imdb
     ? `
       <p class="rating-big"><span class="score">${imdb.score.toFixed(1)}</span><small>/10</small></p>
       <p class="rating-sub">${imdb.votes ? `${esc(imdb.votes)} votes` : "Votes not recorded"}${imdb.asOf ? ` · as of ${esc(isoLabel(imdb.asOf) || imdb.asOf)}` : ""}</p>
-      <p class="fine-print">A snapshot. IMDb ratings keep moving.</p>`
-    : `<p class="rating-none">No IMDb rating yet.</p>`;
+      <p class="fine-print">${fromImdb ? `Updated daily from IMDb.${imdbLink}<br>${IMDB_CREDIT}` : `A snapshot. IMDb ratings keep moving.${imdbLink}`}</p>`
+    : `<p class="rating-none">No IMDb rating yet.${imdbLink}</p>`;
 
   const total = aud.count || 1;
   const audienceCard = aud.count
@@ -973,7 +1038,9 @@ function renderRatings() {
 
   sec.innerHTML = `
     <div class="container">
-      ${sectionHead("ratingsTitle", "Ratings", "Critics and IMDb are entered by our team. Audience ratings come from visitors to this page.")}
+      ${sectionHead("ratingsTitle", "Ratings", fromImdb
+        ? "Critics are entered by our team. The IMDb rating comes from IMDb. Audience ratings come from visitors to this page."
+        : "Critics and IMDb are entered by our team. Audience ratings come from visitors to this page.")}
       <div class="rating-grid${critics || imdb ? "" : " rating-grid-even"}">${cards}
         <article class="panel rating-card"><h3 class="rating-kicker">${icon("users")}Audience</h3>${audienceCard}</article>
       </div>
@@ -1018,7 +1085,7 @@ function renderReviews() {
           </div>
           <p class="fine-print" id="rvHiddenNote" hidden>A moderator has hidden your review, so it isn't shown or counted. Posting again keeps it hidden.</p>
           <button class="btn btn-primary" type="submit" id="rvSubmit">${icon("send")}<span>Post rating</span></button>
-          <p class="fine-print">Saved in this browser only. One rating per film; posting again replaces yours.</p>
+          <p class="fine-print">${ONLINE ? "Everyone sees it once it's posted." : "Saved in this browser only."} One rating per film; posting again replaces yours.</p>
         </form>
         <div class="review-list-wrap">
           <div class="panel-title"><h3 id="reviewListTitle">${icon("message-square")}What viewers say</h3><small id="reviewCount"></small></div>
@@ -1062,9 +1129,17 @@ function renderReviews() {
   };
   fill();
 
-  form.addEventListener("submit", e => {
+  form.addEventListener("submit", async e => {
     e.preventDefault();
-    const res = submitReview(film, { name: $("rvName").value, stars: checked() || undefined, text: text.value });
+    const submit = $("rvSubmit");
+    if (submit.disabled) return;
+    submit.disabled = true;   // one post at a time while the server answers
+    let res;
+    try {
+      res = await submitReview(film, { name: $("rvName").value, stars: checked() || undefined, text: text.value });
+    } finally {
+      submit.disabled = false;
+    }
     if (!res.ok) {
       $("rvError").textContent = res.error;
       if (!checked()) $("star1").focus();
@@ -1082,15 +1157,14 @@ function renderReviews() {
 
 function renderReviewList() {
   const list = filmReviews(film.id);
-  const me = reviewerId();
   $("reviewCount").textContent = list.length ? plural(list.length, "rating") : "";
   $("reviewList").innerHTML = list.length
     ? `<ul class="review-list">
         ${list.map(r => `
-          <li class="review${r.by === me ? " is-mine" : ""}">
+          <li class="review${isMyReview(r) ? " is-mine" : ""}">
             <div class="review-head">
               <strong class="review-name">${esc(r.name)}</strong>
-              ${r.by === me ? `<span class="you-badge">You</span>` : ""}
+              ${isMyReview(r) ? `<span class="you-badge">You</span>` : ""}
               ${starsHTML(r.stars, { size: "sm" })}
               <time datetime="${esc(r.at)}">${esc(ago(r.at))}</time>
             </div>

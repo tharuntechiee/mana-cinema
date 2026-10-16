@@ -422,6 +422,28 @@ code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-siz
 .about-list { display: grid; gap: 10px; padding-left: 18px; color: var(--text-soft); font-size: var(--fs-small); line-height: 1.6; }
 .about-list li::marker { color: var(--muted); }
 
+/* IMDb, TMDB and YouTube syncs (server only): counts, one row per task, then the running log */
+.sync-stats { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-bottom: 16px; list-style: none; color: var(--muted); font-size: var(--fs-small); }
+.sync-stats strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.sync-list { display: grid; margin-bottom: 16px; list-style: none; border-top: 1px solid var(--border); }
+.sync-task { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--border); }
+.sync-task-info { min-width: 0; }
+.sync-task-name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 600; font-size: var(--fs-small); }
+.sync-task .muted { margin-top: 2px; font-size: var(--fs-label); line-height: 1.5; }
+.sync-last { margin-top: 6px; color: var(--text-soft); font-size: var(--fs-label); line-height: 1.5; overflow-wrap: anywhere; }
+.sync-last.is-error { color: var(--danger); }
+.sync-task .btn { flex: 0 0 auto; }
+.sync-state:empty { display: none; }
+.sync-state { font-size: var(--fs-small); }
+.sync-log {
+  max-height: 260px; margin-top: 14px; padding: 12px 14px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius);
+  color: var(--text-soft); font: 500 var(--fs-label)/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (max-width: 560px) {
+  .sync-task { flex-direction: column; gap: 10px; }
+}
+
 /* ---------- Film dialog ---------- */
 /* The one raised surface: a dialog keeps its shadow */
 .admin-dialog {

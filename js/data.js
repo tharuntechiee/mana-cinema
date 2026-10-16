@@ -7,6 +7,32 @@
 
 const DATA_VERSION = 2;
 
+// ---------- The server (Express API + SQLite database) ----------
+// Run with `npm start`, every page first loads api/bootstrap.js, which sets MANA_SERVER to the films and
+// audience reviews in the database: ONLINE is then true and changes go to the API. Opened as plain files or
+// on static hosting (GitHub Pages) there is no server: the pages use the catalogue below and this browser's
+// storage, as before.
+const ONLINE = typeof MANA_SERVER === "object" && MANA_SERVER !== null && Array.isArray(MANA_SERVER.movies);
+
+// Calls the API (api/...) with JSON in and out. Throws an Error with the server's message (and .status).
+async function api(path, { method = "GET", body } = {}) {
+  let res;
+  try {
+    res = await fetch(`api/${path}`, {
+      method,
+      credentials: "same-origin",
+      headers: body === undefined ? {} : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw Object.assign(new Error("Can't reach the MANA CINEMA server. Check your connection and try again."), { status: 0 });
+  }
+  let data = null;
+  try { data = await res.json(); } catch {}
+  if (!res.ok) throw Object.assign(new Error(data?.error || `The server couldn't do that (error ${res.status}).`), { status: res.status });
+  return data;
+}
+
 const DEFAULT_MOVIES = [
   {
     id: 10, art: "og", image: "images/posters/they-call-him-og.jpg", cover: true,
@@ -589,7 +615,8 @@ const DEFAULT_MOVIES = [
 ].concat(typeof INDIA_FILMS !== "undefined" ? INDIA_FILMS : []);   // every other Indian language: js/films-india.js (loaded first)
 
 // ---------- Saved data (localStorage) ----------
-// The admin portal saves its changes here; the website reads them back.
+// Without the server, the admin portal saves its changes here and the website reads them back.
+// With it, only per-visitor conveniences live here (theme, reminders, the leaderboard tab).
 function loadStore(key, fallback) {
   try {
     const v = JSON.parse(localStorage.getItem(key));
@@ -782,7 +809,7 @@ const CATALOG_VERSION = 3;   // 3: this week's releases (ids 3001+)
   } catch {}
 })();
 
-const MOVIES = loadStore("manaMovies", DEFAULT_MOVIES);
+const MOVIES = ONLINE ? MANA_SERVER.movies : loadStore("manaMovies", DEFAULT_MOVIES);
 
 function getMovie(id) {
   return MOVIES.find(m => m.id === Number(id));

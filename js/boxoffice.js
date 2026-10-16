@@ -351,7 +351,8 @@ function imdbScore(m) {
   return score !== null && score > 0 && score <= 10 ? { score, votes: i.votes || "", asOf: i.asOf || "" } : null;
 }
 
-// Audience reviews: written by visitors on the film page and stored in this browser
+// Audience reviews: written by visitors on the film page. On the server they're in the database
+// (MANA_SERVER.reviews, from api/bootstrap.js); without it, in this browser.
 const REVIEWS_KEY = "manaReviews";
 const REVIEW_MAX = 500;
 const NAME_MAX = 40;
@@ -360,7 +361,7 @@ const AUDIENCE_MIN_VOTES = 5;   // below this an average is shown as "early"
 const validStars = v => { const s = Number(v); return Number.isInteger(s) && s >= 1 && s <= 5 ? s : null; };
 
 function allReviews() {
-  return loadStore(REVIEWS_KEY, []);
+  return ONLINE ? MANA_SERVER.reviews || [] : loadStore(REVIEWS_KEY, []);
 }
 // Visible reviews for one film, newest first
 function filmReviews(movieId) {
@@ -413,19 +414,31 @@ function reviewerId() {
     return id;
   } catch { return "guest"; }
 }
+// On the server, a visitor's own review comes marked "mine" (the server knows them by a cookie)
+function isMyReview(r) {
+  return ONLINE ? Boolean(r.mine) : r.by === reviewerId();
+}
 function myReview(movieId) {
-  const me = reviewerId();
-  return allReviews().find(r => r.movieId === Number(movieId) && r.by === me) || null;
+  return allReviews().find(r => r.movieId === Number(movieId) && isMyReview(r)) || null;
 }
 
-// Validate and save a visitor's rating. Returns { ok, error?, replaced?, review? }.
-function submitReview(m, { name = "", stars, text = "" }) {
+// Validate and save a visitor's rating. Resolves to { ok, error?, replaced?, review? }.
+async function submitReview(m, { name = "", stars, text = "" }) {
   if (!m) return { ok: false, error: "That film doesn't exist." };
   if (!isReleased(m)) return { ok: false, error: "Ratings open on release day." };
   const s = Number(stars);
   if (!Number.isInteger(s) || s < 1 || s > 5) return { ok: false, error: "Pick 1 to 5 stars." };
   const body = String(text).trim();
   if (body.length > REVIEW_MAX) return { ok: false, error: `Keep your review under ${REVIEW_MAX} characters.` };
+  if (ONLINE) {
+    try {
+      const res = await api(`movies/${Number(m.id)}/reviews`, { method: "POST", body: { name: String(name).trim().slice(0, NAME_MAX), stars: s, text: body } });
+      MANA_SERVER.reviews = [res.review, ...allReviews().filter(r => !(r.movieId === m.id && r.mine))];
+      return { ok: true, replaced: res.replaced, review: res.review };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  }
   const me = reviewerId();
   const list = allReviews();
   const old = list.find(r => r.movieId === m.id && r.by === me);
