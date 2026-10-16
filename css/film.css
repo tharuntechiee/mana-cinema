@@ -445,3 +445,99 @@ section.film-section { padding: 0; margin-top: 56px; }
 @media (prefers-reduced-motion: reduce) {
   .star-row label:hover { transform: none; }
 }
+
+/* ---------- Comments (server only): YouTube-style threads ---------- */
+.cm-total { color: var(--muted); font-size: var(--fs-small); font-weight: 600; font-variant-numeric: tabular-nums; }
+.cm-total:empty { display: none; }
+.cm-toolbar { display: flex; margin-bottom: 18px; }
+.cm-sort { position: relative; display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+.cm-sort svg.lucide { width: 16px; height: 16px; }
+.cm-sort select {
+  min-height: 36px; padding: 0 12px; background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 999px; font: inherit; font-size: var(--fs-small); font-weight: 600; cursor: pointer;
+}
+.cm-sort select:hover { border-color: var(--border-strong); }
+.cm-compose, .cm { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 14px; align-items: start; }
+.cm-compose { margin-bottom: 26px; }
+.cm-avatar {
+  display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+  background: var(--surface-3); border: 1px solid var(--border); color: var(--text);
+  font-size: var(--fs-small); font-weight: 700; letter-spacing: -0.02em; line-height: 1; overflow: hidden;
+}
+.cm-avatar svg.lucide { width: 18px; height: 18px; }
+.cm-avatar.is-official { background: rgba(var(--gold-rgb), .18); border-color: rgba(var(--gold-rgb), .45); color: var(--gold-ink); }
+.cm-main { min-width: 0; }
+
+/* The box: one line until it's used, then the name field, count and buttons appear */
+.cm-input {
+  display: block; width: 100%; min-height: 40px; max-height: 260px; padding: 9px 0 8px; resize: none; overflow-y: auto;
+  background: transparent; color: var(--text); border: 0; border-bottom: 1px solid var(--border-strong); border-radius: 0;
+  font: inherit; font-size: var(--fs-small); line-height: 1.6;
+}
+.cm-input::placeholder { color: var(--muted); }
+.cm-input:focus { outline: none; border-bottom-color: var(--text); box-shadow: 0 1px 0 var(--text); }
+.cm-form-extra { display: none; align-items: center; flex-wrap: wrap; gap: 10px 12px; margin-top: 10px; }
+.cm-form.is-open .cm-form-extra { display: flex; }
+.cm-name-input {
+  flex: 1 1 180px; max-width: 260px; min-height: 36px; padding: 0 12px; background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius-sm); font: inherit; font-size: var(--fs-small);
+}
+.cm-name-input:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+.cm-left { color: var(--muted); font-size: var(--fs-label); font-variant-numeric: tabular-nums; }
+.cm-form-buttons { display: flex; gap: 8px; margin-left: auto; }
+.cm-form-buttons .btn:disabled { opacity: .45; cursor: not-allowed; }
+.cm-error { flex-basis: 100%; }
+
+.cm-list, .cm-replies { list-style: none; display: grid; }
+.cm-list { gap: 22px; }
+.cm-replies { gap: 16px; margin-top: 12px; }
+.cm-replies[hidden] { display: none; }
+.cm.is-reply { grid-template-columns: 28px minmax(0, 1fr); gap: 10px; }
+.cm.is-reply > .cm-avatar { width: 28px; height: 28px; font-size: var(--fs-label); }
+.cm.is-reply > .cm-avatar svg.lucide { width: 14px; height: 14px; }
+.cm-pin { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; color: var(--muted); font-size: var(--fs-label); font-weight: 600; }
+.cm-pin svg.lucide { width: 12px; height: 12px; }
+.cm-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.cm-name { font-size: var(--fs-small); font-weight: 600; overflow-wrap: anywhere; }
+.cm-badge { padding: 1px 8px; border-radius: 999px; background: rgba(var(--gold-rgb), .18); color: var(--gold-ink); font-size: var(--fs-label); font-weight: 700; line-height: 1.5; }
+.cm-head time, .cm-edited { color: var(--muted); font-size: var(--fs-label); }
+.cm-note { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: var(--warn); font-size: var(--fs-label); font-weight: 600; }
+.cm-note svg.lucide { width: 14px; height: 14px; }
+.cm.is-hidden > .cm-main > .cm-text { opacity: .6; }
+.cm-text { margin-top: 4px; color: var(--text-soft); font-size: var(--fs-small); line-height: 1.6; white-space: pre-line; overflow-wrap: anywhere; }
+.cm-text.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; }
+.cm-mention { color: var(--gold); font-weight: 600; }
+
+.cm-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 4px; margin: 6px 0 0 -8px; }
+.cm-btn {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 10px; background: transparent; border: 0;
+  border-radius: 999px; color: var(--text-soft); font: inherit; font-size: var(--fs-label); font-weight: 600; cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.cm-btn:hover { background: var(--ghost); color: var(--text); }
+.cm-btn svg.lucide { width: 16px; height: 16px; }
+.cm-vote.is-on { color: var(--gold); }
+.cm-vote.is-on svg.lucide { fill: currentColor; fill-opacity: .25; }
+.cm-count { min-width: 1ch; font-variant-numeric: tabular-nums; }
+.cm-count:empty { display: none; }
+.cm-more { margin: 2px 0 0 -10px; }
+.cm-heart { display: inline-flex; align-items: center; padding: 0 8px; color: var(--danger); }
+.cm-heart svg.lucide { width: 16px; height: 16px; fill: currentColor; }
+.cm-slot:not(:empty) { margin-top: 10px; }
+.cm-replies-toggle { margin: 4px 0 0 -10px; color: var(--gold); }
+.cm-replies-toggle svg.lucide { transition: rotate .2s; }
+.cm-replies-toggle.is-open svg.lucide { rotate: 180deg; }
+.cm-replies-toggle[hidden] { display: none; }
+.cm-status { margin-bottom: 14px; font-size: var(--fs-small); }
+.cm-status:empty { display: none; }
+.cm-more-btn { margin-top: 22px; }
+.cm-rules { margin-top: 22px; max-width: 70ch; }
+.cm-empty { margin-top: 6px; }
+@media (max-width: 760px) {
+  .cm-compose, .cm { grid-template-columns: 32px minmax(0, 1fr); gap: 10px; }
+  .cm-avatar { width: 32px; height: 32px; }
+  .cm.is-reply { grid-template-columns: 24px minmax(0, 1fr); }
+  .cm.is-reply > .cm-avatar { width: 24px; height: 24px; }
+  .cm-name-input { max-width: none; flex-basis: 100%; }
+  .cm-form-buttons { margin-left: 0; width: 100%; justify-content: flex-end; }
+}

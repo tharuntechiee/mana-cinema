@@ -14,11 +14,12 @@ const MESSAGES_KEY = "manaMessages";
 const SAVE_FAILED = ONLINE ? "Couldn't save. Check the server is running and try again." : "Couldn't save. Browser storage may be full or blocked.";
 
 // On the server: the films, reviews and messages loaded at sign-in, kept in step with every save
-const live = { movies: [], reviews: [], messages: [] };
+const live = { movies: [], reviews: [], messages: [], comments: [] };
 async function loadLive() {
   const data = await api("admin/data");
   live.movies = data.movies;
   live.messages = data.messages;
+  live.comments = data.comments || [];
   setLiveReviews(data.reviews);
 }
 // boxoffice.js reads audience reviews from MANA_SERVER.reviews (the critics preview shows the audience score)
@@ -359,11 +360,11 @@ $("logoutBtn").addEventListener("click", signOut);
 $("logoutTop").addEventListener("click", signOut);
 
 // ---------- Navigation ----------
-const VIEWS = { dashboard: "Dashboard", films: "Films", collections: "Collections", ratings: "Ratings", messages: "Messages", settings: "Settings" };
+const VIEWS = { dashboard: "Dashboard", films: "Films", collections: "Collections", ratings: "Ratings", comments: "Comments", messages: "Messages", settings: "Settings" };
 const OLD_VIEWS = { movies: "films" };   // links saved from the old portal
 const RENDER = {
   dashboard: renderDashboard, films: renderFilms, collections: renderCollections,
-  ratings: renderRatings, messages: renderMessages, settings: renderSettings,
+  ratings: renderRatings, comments: renderComments, messages: renderMessages, settings: renderSettings,
 };
 let currentView = null;
 
@@ -1817,12 +1818,163 @@ $("markAllRead").addEventListener("click", async () => {
   $("viewTitle").focus();
 });
 
+// ---------- Comments: moderation (server only) ----------
+// Every comment and reply, newest first. Pin one comment per film, heart, hide or delete comments, and
+// reply as MANA CINEMA (shown as "Official" on the film page).
+const CM_PAGE = 30;
+const cmView = { film: "", q: "", hiddenOnly: false, shown: CM_PAGE };
+
+function renderComments() {
+  const all = live.comments.slice().sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  const films = new Map(db.peek().map(m => [m.id, m]));
+  const filmName = id => films.get(id)?.title || `Deleted film #${id}`;
+  const byId = new Map(all.map(c => [c.id, c]));
+  const counts = new Map();
+  all.forEach(c => counts.set(c.movieId, (counts.get(c.movieId) || 0) + 1));
+  if (cmView.film && !counts.has(Number(cmView.film))) cmView.film = "";
+  const ids = [...counts.keys()].sort((a, b) => filmName(a).localeCompare(filmName(b)));
+  $("cmFilm").innerHTML = `<option value="">All films (${all.length})</option>` +
+    ids.map(id => `<option value="${esc(String(id))}">${esc(filmName(id))} (${counts.get(id)})</option>`).join("");
+  $("cmFilm").value = cmView.film;
+  $("cmSearch").value = cmView.q;
+  $("cmHiddenOnly").checked = cmView.hiddenOnly;
+
+  const q = cmView.q.trim().toLowerCase();
+  const list = all.filter(c => (!cmView.film || c.movieId === Number(cmView.film)) && (!cmView.hiddenOnly || c.hidden)
+    && (!q || [c.name, c.text, filmName(c.movieId)].join(" ").toLowerCase().includes(q)));
+  const hidden = all.filter(c => c.hidden).length;
+  $("cmCount").textContent = all.length ? `${plural(all.length, "comment")} · ${hidden} hidden` : "";
+  $("cmFilters").hidden = !all.length;
+  const shown = list.slice(0, cmView.shown);
+
+  $("cmList").innerHTML = shown.length ? shown.map(c => {
+    const parent = c.parentId ? byId.get(c.parentId) : null;
+    const id = esc(String(c.id));
+    return `
+    <article class="panel message cm-card${c.hidden ? " is-hidden" : ""}" data-id="${id}">
+      <div class="message-head">
+        <div><strong>${esc(c.name)}</strong> <span class="muted">on <a href="film.html?id=${Number(c.movieId)}#comments" target="_blank" rel="noopener">${esc(filmName(c.movieId))}</a></span></div>
+        <div class="chip-row">
+          ${c.byAdmin ? `<span class="chip chip-accent">Official</span>` : ""}
+          ${c.parentId ? `<span class="chip">Reply</span>` : ""}
+          ${c.pinned ? `<span class="chip chip-accent"><i data-lucide="pin"></i> Pinned</span>` : ""}
+          ${c.hearted ? `<span class="chip chip-film"><i data-lucide="heart"></i> Hearted</span>` : ""}
+          ${c.hidden ? `<span class="chip">Hidden</span>` : ""}
+        </div>
+      </div>
+      ${parent ? `<p class="muted cm-context">Replying to ${esc(parent.name)}: ${esc(parent.text.length > 90 ? parent.text.slice(0, 90) + "…" : parent.text)}</p>` : ""}
+      <p class="cm-body">${esc(c.text)}</p>
+      <div class="message-foot">
+        <small class="muted">${fmtTime(c.at)}${c.editedAt ? " (edited)" : ""} · ${c.likes} ${c.likes === 1 ? "like" : "likes"} · ${c.dislikes} ${c.dislikes === 1 ? "dislike" : "dislikes"}${c.parentId ? "" : ` · ${plural(c.replyCount, "reply", "replies")}`}</small>
+        <span>
+          ${c.parentId ? "" : `<button type="button" class="link-btn" data-cm="pin" data-id="${id}"><i data-lucide="pin"></i> ${c.pinned ? "Unpin" : "Pin"}</button>`}
+          <button type="button" class="link-btn" data-cm="heart" data-id="${id}"><i data-lucide="heart"></i> ${c.hearted ? "Remove heart" : "Heart"}</button>
+          <button type="button" class="link-btn" data-cm="hide" data-id="${id}"><i data-lucide="${c.hidden ? "eye" : "eye-off"}"></i> ${c.hidden ? "Show" : "Hide"}</button>
+          <button type="button" class="link-btn" data-cm="reply" data-id="${id}"><i data-lucide="reply"></i> Reply</button>
+          <button type="button" class="link-btn danger" data-cm="delete" data-id="${id}"><i data-lucide="trash-2"></i> Delete</button>
+        </span>
+      </div>
+      <form class="cm-reply-form" data-id="${id}" hidden>
+        <label class="sr-only" for="cmReply${id}">Reply as MANA CINEMA to ${esc(c.name)}</label>
+        <textarea id="cmReply${id}" rows="3" maxlength="1500" placeholder="Reply as MANA CINEMA…"></textarea>
+        <div class="cm-reply-actions">
+          <button type="button" class="btn btn-ghost btn-sm" data-cm="cancel" data-id="${id}">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm"><i data-lucide="send"></i> Reply</button>
+        </div>
+      </form>
+    </article>`;
+  }).join("") + (list.length > shown.length ? `<button type="button" class="btn btn-ghost btn-sm" id="cmShowMore">Show ${Math.min(CM_PAGE, list.length - shown.length)} more of ${list.length - shown.length}</button>` : "")
+    : `<div class="admin-empty"><i data-lucide="messages-square"></i><p>${all.length ? "No comments match." : "No comments yet. Visitors comment on each film's page."}</p></div>`;
+  icons();
+}
+
+// Replace one comment (or add a new one) in the loaded list
+function cmUpsert(c) {
+  const i = live.comments.findIndex(x => x.id === c.id);
+  if (i >= 0) live.comments[i] = c; else live.comments.push(c);
+}
+
+$("cmFilm").addEventListener("change", e => { cmView.film = e.target.value; cmView.shown = CM_PAGE; renderComments(); });
+$("cmSearch").addEventListener("input", e => { cmView.q = e.target.value; cmView.shown = CM_PAGE; renderComments(); $("cmSearch").focus(); });
+$("cmHiddenOnly").addEventListener("change", e => { cmView.hiddenOnly = e.target.checked; cmView.shown = CM_PAGE; renderComments(); });
+
+$("cmList").addEventListener("click", async e => {
+  if (e.target.closest("#cmShowMore")) { cmView.shown += CM_PAGE; return renderComments(); }
+  const btn = e.target.closest("[data-cm]");
+  if (!btn) return;
+  const id = Number(btn.dataset.id), c = live.comments.find(x => x.id === id), act = btn.dataset.cm;
+  if (!c) return renderComments();
+  const card = btn.closest(".cm-card");
+  if (act === "reply") {
+    const form = card.querySelector(".cm-reply-form");
+    form.hidden = !form.hidden;
+    if (!form.hidden) form.querySelector("textarea").focus();
+    return;
+  }
+  if (act === "cancel") {
+    const form = card.querySelector(".cm-reply-form");
+    form.hidden = true;
+    form.querySelector("textarea").value = "";
+    return card.querySelector('[data-cm="reply"]').focus();
+  }
+  if (act === "delete") {
+    const replies = c.parentId ? 0 : c.replyCount;
+    if (!confirm(`Delete ${c.name}'s comment${replies ? ` and its ${plural(replies, "reply", "replies")}` : ""}? This can't be undone.`)) return;
+    try {
+      await api(`admin/comments/${id}`, { method: "DELETE" });
+      live.comments = live.comments.filter(x => x.id !== id && x.parentId !== id);
+    } catch (err) { return saveFailed(err); }
+    renderComments();
+    toast("Comment deleted");
+    return $("cmSearch").offsetParent ? $("cmSearch").focus() : $("viewTitle").focus();
+  }
+  const patch = act === "pin" ? { pinned: !c.pinned } : act === "heart" ? { hearted: !c.hearted } : { hidden: !c.hidden };
+  try {
+    const { comment } = await api(`admin/comments/${id}`, { method: "PATCH", body: patch });
+    if (patch.pinned) live.comments.forEach(x => { if (x.movieId === comment.movieId && x.id !== id) x.pinned = false; });
+    cmUpsert(comment);
+  } catch (err) { return saveFailed(err); }
+  renderComments();
+  toast(act === "pin" ? (patch.pinned ? "Pinned to the top of the film's comments" : "Unpinned")
+    : act === "heart" ? (patch.hearted ? "Hearted" : "Heart removed")
+    : (patch.hidden ? "Hidden from the website" : "Visible again"));
+  refocus(`[data-cm="${act}"][data-id="${id}"]`, "#cmSearch");
+});
+
+$("cmList").addEventListener("submit", async e => {
+  e.preventDefault();
+  const form = e.target.closest(".cm-reply-form");
+  const c = live.comments.find(x => x.id === Number(form.dataset.id));
+  const text = form.querySelector("textarea").value;
+  const send = form.querySelector('[type="submit"]');
+  if (!c || !text.trim() || send.disabled) return;
+  send.disabled = true;
+  try {
+    const { comment } = await api("admin/comments", { method: "POST", body: { movieId: c.movieId, parentId: c.id, text } });
+    cmUpsert(comment);
+    const thread = live.comments.find(x => x.id === comment.parentId);
+    if (thread) thread.replyCount++;
+  } catch (err) {
+    send.disabled = false;
+    return saveFailed(err);
+  }
+  renderComments();
+  toast("Reply posted as MANA CINEMA");
+  $("viewTitle").focus();
+});
+
 // ---------- Settings: backup, restore, reset ----------
-$("backupBtn").addEventListener("click", () => {
-  // catalog: which catalogue the films already include (data.js CATALOG_VERSION), so a restore knows what to add back
-  const backup = { app: "mana-cinema", version: DATA_VERSION, catalog: CATALOG_VERSION, exportedAt: new Date().toISOString(), movies: db.movies(), reviews: db.reviews(), messages: db.messages() };
+$("backupBtn").addEventListener("click", async () => {
+  let backup;
+  if (ONLINE) {
+    try { backup = await api("admin/backup"); } catch (err) { return saveFailed(err); }
+  } else {
+    // catalog: which catalogue the films already include (data.js CATALOG_VERSION), so a restore knows what to add back
+    backup = { app: "mana-cinema", version: DATA_VERSION, catalog: CATALOG_VERSION, exportedAt: new Date().toISOString(), movies: db.movies(), reviews: db.reviews(), messages: db.messages() };
+  }
   download(`mana-cinema-backup-${todayISO()}.json`, JSON.stringify(backup, null, 2), "application/json");
-  toast(`Backup ready: ${plural(backup.movies.length, "film")}, ${plural(backup.reviews.length, "review")}, ${plural(backup.messages.length, "message")}`);
+  const comments = backup.comments ? `, ${plural(backup.comments.length, "comment")}` : "";
+  toast(`Backup ready: ${plural(backup.movies.length, "film")}, ${plural(backup.reviews.length, "review")}, ${plural(backup.messages.length, "message")}${comments}`);
 });
 
 // Why a backup can't be restored, or "" when it's fine
@@ -1859,7 +2011,8 @@ async function restoreData(data, { from, say }) {
   const older = !(Number(data.catalog) >= CATALOG_VERSION);
   const added = older ? " Films added to the site's catalogue since this backup was made are added back." : "";
   const kept = ONLINE ? " IMDb IDs, IMDb ratings, cast and crew, and trailers found by the syncs are kept for films the backup doesn't set them for." : "";
-  if (!confirm(`Restore ${plural(data.movies.length, "film")}, ${plural(data.reviews.length, "audience review")} and ${plural(data.messages.length, "message")} from ${from}${when}?\n\nThis replaces the films, reviews and messages ${ONLINE ? "in the database" : "in this browser"}.${added}${kept}`)) return say("Restore cancelled. Nothing changed.", false);
+  const withComments = Array.isArray(data.comments) && ONLINE ? `, ${plural(data.comments.length, "comment")}` : "";
+  if (!confirm(`Restore ${plural(data.movies.length, "film")}, ${plural(data.reviews.length, "audience review")}${withComments} and ${plural(data.messages.length, "message")} from ${from}${when}?\n\nThis replaces the films, reviews${withComments ? ", comments" : ""} and messages ${ONLINE ? "in the database" : "in this browser"}.${added}${kept}`)) return say("Restore cancelled. Nothing changed.", false);
   if (ONLINE) {
     say("Restoring…", false);
     try {
@@ -1925,6 +2078,7 @@ const RESETS = {
   films: { key: MOVIES_KEY, ask: "Restore the original films and collections? Films you added and every edit you made are removed.", done: "Original films and collections restored" },
   reviews: { key: REVIEWS_KEY, ask: ONLINE ? "Delete every audience review in the database?" : "Delete all audience reviews stored in this browser?", done: "All audience reviews deleted" },
   messages: { key: MESSAGES_KEY, ask: "Delete all messages?", done: "All messages deleted" },
+  comments: { key: null, ask: "Delete every comment and reply in the database?", done: "All comments deleted" },   // server only
 };
 document.querySelectorAll("[data-reset]").forEach(btn => btn.addEventListener("click", async () => {
   const r = RESETS[btn.dataset.reset];
@@ -2016,6 +2170,8 @@ $("syncList").addEventListener("click", e => {
 $("syncAll").addEventListener("click", () => runSync("all"));
 
 // ---------- Start ----------
+document.querySelectorAll("[data-online]").forEach(el => { el.hidden = !ONLINE; });
+document.querySelectorAll("[data-offline]").forEach(el => { el.hidden = ONLINE; });
 // On the server the session cookie says whether the admin is signed in; the browser-only demo uses sessionStorage
 (async function start() {
   if (!ONLINE) {

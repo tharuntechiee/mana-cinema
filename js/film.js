@@ -1175,6 +1175,335 @@ function renderReviewList() {
   icons();
 }
 
+// ---------- Comments (server only) ----------
+// YouTube-style: comment, reply (threads one level deep), like or dislike, sort by Top or Newest, edit or
+// delete your own. MANA CINEMA's own replies are marked Official, and it can pin and heart comments.
+// Visitors need no account: the server knows them by a cookie. Without the server there are no comments.
+const CM_MAX = 1500;
+const CM_NAME_MAX = 40;
+const CM_CLAMP = 420;   // longer comments start shortened, with "Read more"
+const cm = { sort: "top", items: [], serverCount: 0, total: 0, hasMore: false, replies: new Map(), open: new Set() };
+const cmName = {
+  get() { try { return localStorage.getItem("manaCommentName") || ""; } catch { return ""; } },
+  set(v) { try { localStorage.setItem("manaCommentName", v); } catch {} },
+};
+const cmFind = id => cm.items.find(c => c.id === id) || [...cm.replies.values()].flat().find(c => c.id === id) || null;
+// "@Name hello": the name it replies to is highlighted
+const cmText = text => esc(text).replace(/^@([^\s@]+)/, `<span class="cm-mention">@$1</span>`);
+
+function cmRepliesBlock(c) {
+  if (c.parentId) return "";
+  const open = cm.open.has(c.id);
+  return `
+    <button type="button" class="cm-btn cm-replies-toggle" data-act="replies" aria-expanded="${open}"${c.replyCount ? "" : " hidden"}>${icon("chevron-down")}<span>${plural(c.replyCount, "reply", "replies")}</span></button>
+    <ul class="cm-replies"${open ? "" : " hidden"}></ul>`;
+}
+
+function commentHTML(c) {
+  const long = c.text.length > CM_CLAMP || c.text.split("\n").length > 6;
+  const liked = c.myVote === 1, disliked = c.myVote === -1;
+  return `
+    <li class="cm${c.parentId ? " is-reply" : ""}${c.mine ? " is-mine" : ""}${c.hidden ? " is-hidden" : ""}" data-id="${c.id}">
+      <span class="cm-avatar${c.byAdmin ? " is-official" : ""}" aria-hidden="true">${c.byAdmin ? icon("clapperboard") : esc(initials(c.name))}</span>
+      <div class="cm-main">
+        ${c.pinned ? `<p class="cm-pin">${icon("pin")}Pinned by MANA CINEMA</p>` : ""}
+        <div class="cm-head">
+          <strong class="cm-name">${esc(c.name)}</strong>
+          ${c.byAdmin ? `<span class="cm-badge">Official</span>` : ""}
+          ${c.mine && !c.byAdmin ? `<span class="you-badge">You</span>` : ""}
+          <time datetime="${esc(c.at)}">${esc(ago(c.at))}</time>
+          ${c.editedAt ? `<span class="cm-edited">(edited)</span>` : ""}
+        </div>
+        ${c.hidden ? `<p class="cm-note">${icon("eye-off")}A moderator hid this comment. Only you can see it.</p>` : ""}
+        <p class="cm-text${long ? " clamp" : ""}">${cmText(c.text)}</p>
+        ${long ? `<button type="button" class="cm-btn cm-more" data-act="more" aria-expanded="false">Read more</button>` : ""}
+        <div class="cm-actions">
+          <button type="button" class="cm-btn cm-vote${liked ? " is-on" : ""}" data-act="like" aria-pressed="${liked}" aria-label="Like">${icon("thumbs-up")}<span class="cm-count">${c.likes ? compactCount(c.likes) : ""}</span></button>
+          <button type="button" class="cm-btn cm-vote${disliked ? " is-on" : ""}" data-act="dislike" aria-pressed="${disliked}" aria-label="Dislike">${icon("thumbs-down")}</button>
+          <button type="button" class="cm-btn" data-act="reply">Reply</button>
+          ${c.hearted ? `<span class="cm-heart" title="Hearted by MANA CINEMA">${icon("heart")}<span class="sr-only">Hearted by MANA CINEMA</span></span>` : ""}
+          ${c.mine ? `<button type="button" class="cm-btn" data-act="edit">Edit</button><button type="button" class="cm-btn" data-act="delete">Delete</button>` : ""}
+        </div>
+        <div class="cm-slot"></div>
+        ${cmRepliesBlock(c)}
+      </div>
+    </li>`;
+}
+
+// The comment as a ready element (its replies drawn too, when its thread is open)
+function commentEl(c) {
+  const t = document.createElement("template");
+  t.innerHTML = commentHTML(c).trim();
+  const li = t.content.firstElementChild;
+  if (!c.parentId && cm.open.has(c.id)) drawReplies(li, c);
+  return li;
+}
+function drawReplies(li, thread) {
+  const ul = li.querySelector(":scope > .cm-main > .cm-replies");
+  const toggle = li.querySelector(":scope > .cm-main > .cm-replies-toggle");
+  if (!ul || !toggle) return;
+  const open = cm.open.has(thread.id), replies = cm.replies.get(thread.id);
+  toggle.hidden = !thread.replyCount;
+  toggle.setAttribute("aria-expanded", open);
+  toggle.querySelector("span").textContent = plural(thread.replyCount, "reply", "replies");
+  toggle.classList.toggle("is-open", open);
+  ul.hidden = !open;
+  if (open && replies) ul.replaceChildren(...replies.map(commentEl));
+  icons();
+}
+const cmLi = id => $("commentList").querySelector(`.cm[data-id="${id}"]`);
+function cmRedraw(c) {
+  const old = cmLi(c.id);
+  if (old) old.replaceWith(commentEl(c));
+  icons();
+}
+
+function composerHTML({ label, submit = "Comment", text = "", showName = true, cancel = true }) {
+  return `
+    <form class="cm-form" novalidate>
+      <textarea class="cm-input" rows="1" maxlength="${CM_MAX}" placeholder="${esc(label)}" aria-label="${esc(label)}">${esc(text)}</textarea>
+      <div class="cm-form-extra">
+        ${showName ? `<input class="cm-name-input" maxlength="${CM_NAME_MAX}" placeholder="Your name (optional)" aria-label="Your name, optional" autocomplete="nickname" value="${esc(cmName.get())}">` : ""}
+        <span class="cm-left" aria-hidden="true">0/${CM_MAX}</span>
+        <span class="cm-form-buttons">
+          ${cancel ? `<button type="button" class="btn btn-ghost btn-sm" data-act="cancel">Cancel</button>` : ""}
+          <button type="submit" class="btn btn-primary btn-sm" disabled>${esc(submit)}</button>
+        </span>
+        <p class="form-error cm-error" role="alert"></p>
+      </div>
+    </form>`;
+}
+
+// Makes a composer work: grows with the text, counts characters, and sends through onSubmit({ text, name }),
+// which resolves when saved (then onDone runs) or throws the message to show under the box.
+function wireComposer(form, { onSubmit, onDone, onCancel }) {
+  const input = form.querySelector(".cm-input"), send = form.querySelector('[type="submit"]'), nameBox = form.querySelector(".cm-name-input");
+  const sync = () => {
+    input.style.height = "auto";
+    input.style.height = `${Math.min(input.scrollHeight, 260)}px`;
+    form.classList.toggle("is-open", form.contains(document.activeElement) || input.value.trim() !== "");
+    form.querySelector(".cm-left").textContent = `${input.value.length}/${CM_MAX}`;
+    send.disabled = !input.value.trim();
+  };
+  input.addEventListener("input", sync);
+  form.addEventListener("focusin", sync);
+  form.addEventListener("focusout", () => setTimeout(sync));
+  form.querySelector('[data-act="cancel"]')?.addEventListener("click", () => {
+    input.value = "";
+    form.querySelector(".cm-error").textContent = "";
+    sync();
+    onCancel?.();
+  });
+  input.addEventListener("keydown", e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !send.disabled) form.requestSubmit();
+  });
+  form.addEventListener("submit", async e => {
+    e.preventDefault();
+    if (send.disabled) return;
+    const error = form.querySelector(".cm-error");
+    error.textContent = "";
+    send.disabled = true;
+    try {
+      const name = nameBox ? nameBox.value.trim() : "";
+      if (nameBox) cmName.set(name);
+      await onSubmit({ text: input.value, name });
+      input.value = "";
+      sync();
+      onDone?.();
+    } catch (err) {
+      error.textContent = err.message;
+      sync();
+    }
+  });
+  sync();
+}
+
+const cmCountText = () => { $("cmTotal").textContent = cm.total ? plural(cm.total, "comment") : ""; };
+const cmEmpty = () => { $("cmEmpty").hidden = $("commentList").children.length !== 0; };
+
+async function loadComments({ more = false } = {}) {
+  const list = $("commentList"), moreBtn = $("cmMore");
+  if (!more) {
+    cm.items = []; cm.serverCount = 0; cm.replies.clear(); cm.open.clear();
+    list.replaceChildren();
+    $("cmStatus").textContent = "Loading comments…";
+  } else {
+    moreBtn.disabled = true;
+  }
+  let data;
+  try {
+    data = await api(`movies/${Number(film.id)}/comments?sort=${cm.sort}&offset=${cm.serverCount}&limit=20`);
+  } catch (err) {
+    $("cmStatus").innerHTML = `${esc(err.message)} <button type="button" class="cm-btn" id="cmRetry">Try again</button>`;
+    $("cmRetry").addEventListener("click", () => loadComments({ more }));
+    moreBtn.disabled = false;
+    return;
+  }
+  $("cmStatus").textContent = "";
+  const seen = new Set(cm.items.map(c => c.id));
+  const fresh = data.comments.filter(c => !seen.has(c.id));   // your own new comment may also be on the next page
+  cm.serverCount += data.comments.length;
+  cm.items.push(...fresh);
+  cm.total = data.total;
+  cm.hasMore = data.hasMore;
+  list.append(...fresh.map(commentEl));
+  moreBtn.hidden = !cm.hasMore;
+  moreBtn.disabled = false;
+  cmCountText();
+  cmEmpty();
+  icons();
+}
+
+async function showReplies(thread) {
+  if (!cm.replies.has(thread.id)) {
+    const label = cmLi(thread.id).querySelector(":scope > .cm-main > .cm-replies-toggle span");
+    label.textContent = "Loading…";
+    try { cm.replies.set(thread.id, (await api(`comments/${thread.id}/replies`)).replies); }
+    catch (err) { toast(err.message); drawReplies(cmLi(thread.id), thread); return; }
+  }
+  cm.open.add(thread.id);
+  drawReplies(cmLi(thread.id), thread);
+}
+
+// Opens a composer under a comment; wire(form, close) hooks it up
+function openSlot(li, html, wire) {
+  const slot = li.querySelector(":scope > .cm-main > .cm-slot");
+  slot.innerHTML = html;
+  const form = slot.querySelector("form");
+  wire(form, () => { slot.innerHTML = ""; });
+  icons();
+  const input = form.querySelector(".cm-input");
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+}
+
+async function cmAction(act, btn) {
+  const li = btn.closest(".cm");
+  const c = cmFind(Number(li.dataset.id));
+  if (!c) return;
+  if (act === "more") {
+    const text = li.querySelector(":scope > .cm-main > .cm-text");
+    const open = btn.getAttribute("aria-expanded") !== "true";
+    text.classList.toggle("clamp", !open);
+    btn.setAttribute("aria-expanded", open);
+    btn.textContent = open ? "Show less" : "Read more";
+  } else if (act === "like" || act === "dislike") {
+    const want = act === "like" ? 1 : -1;
+    try {
+      const res = await api(`comments/${c.id}/vote`, { method: "PUT", body: { vote: c.myVote === want ? 0 : want } });
+      c.likes = res.likes;
+      c.myVote = res.myVote;
+      const [up, down] = li.querySelectorAll(":scope > .cm-main > .cm-actions .cm-vote");
+      up.classList.toggle("is-on", c.myVote === 1);
+      up.setAttribute("aria-pressed", c.myVote === 1);
+      up.querySelector(".cm-count").textContent = c.likes ? compactCount(c.likes) : "";
+      down.classList.toggle("is-on", c.myVote === -1);
+      down.setAttribute("aria-pressed", c.myVote === -1);
+    } catch (err) { toast(err.message); }
+  } else if (act === "replies") {
+    if (cm.open.has(c.id)) { cm.open.delete(c.id); drawReplies(li, c); } else await showReplies(c);
+  } else if (act === "reply") {
+    const thread = c.parentId ? cmFind(c.parentId) : c;
+    openSlot(li, composerHTML({ label: `Reply to ${c.name}…`, submit: "Reply", text: c.parentId ? `@${c.name.replace(/\s+/g, "")} ` : "" }), (form, close) => {
+      wireComposer(form, {
+        onCancel: close,
+        onSubmit: async ({ text, name }) => {
+          await api(`movies/${Number(film.id)}/comments`, { method: "POST", body: { name, text, parentId: c.id } });
+          cm.replies.set(thread.id, (await api(`comments/${thread.id}/replies`)).replies);   // everyone's replies, in order
+          thread.replyCount = cm.replies.get(thread.id).length;
+          cm.total++;
+          cm.open.add(thread.id);
+          drawReplies(cmLi(thread.id), thread);
+          cmCountText();
+          toast("Reply posted");
+        },
+        onDone: close,
+      });
+    });
+  } else if (act === "edit") {
+    openSlot(li, composerHTML({ label: "Edit your comment", submit: "Save", text: c.text, showName: false }), (form, close) => {
+      wireComposer(form, {
+        onCancel: close,
+        onSubmit: async ({ text }) => {
+          const res = await api(`comments/${c.id}`, { method: "PATCH", body: { text } });
+          Object.assign(c, res.comment);
+          cmRedraw(c);
+          toast("Comment updated");
+        },
+      });
+    });
+  } else if (act === "delete") {
+    if (!confirm(c.parentId ? "Delete your reply? This can't be undone." : "Delete your comment? Its replies go too. This can't be undone.")) return;
+    try { await api(`comments/${c.id}`, { method: "DELETE" }); } catch (err) { return toast(err.message); }
+    if (c.parentId) {
+      const thread = cmFind(c.parentId);
+      cm.replies.set(thread.id, (cm.replies.get(thread.id) || []).filter(r => r.id !== c.id));
+      thread.replyCount = Math.max(0, thread.replyCount - 1);
+      cm.total = Math.max(0, cm.total - 1);
+      drawReplies(cmLi(thread.id), thread);
+    } else {
+      cm.items = cm.items.filter(x => x.id !== c.id);
+      cm.replies.delete(c.id);
+      cm.total = Math.max(0, cm.total - 1 - c.replyCount);
+      li.remove();
+    }
+    cmCountText();
+    cmEmpty();
+    toast("Comment deleted");
+  }
+}
+
+function renderComments() {
+  const sec = $("comments");
+  if (!ONLINE) { sec.hidden = true; return false; }   // comments live in the server's database
+  sec.innerHTML = `
+    <div class="container">
+      <div class="film-section-head">
+        <h2 id="commentsTitle">Comments</h2>
+        <p class="cm-total" id="cmTotal" aria-live="polite"></p>
+      </div>
+      <div class="cm-toolbar">
+        <label class="cm-sort">${icon("arrow-up-down")}<span class="sr-only">Sort comments by</span>
+          <select id="cmSort"><option value="top">Top comments</option><option value="new">Newest first</option></select>
+        </label>
+      </div>
+      <div class="cm-compose">
+        <span class="cm-avatar" aria-hidden="true">${icon("user")}</span>
+        <div class="cm-main" id="cmComposeSlot"></div>
+      </div>
+      <p class="muted cm-status" id="cmStatus" role="status"></p>
+      <ul class="cm-list" id="commentList"></ul>
+      <div class="empty-state cm-empty" id="cmEmpty" hidden><div class="empty-icon">${icon("message-circle")}</div><p>No comments yet. Start the conversation.</p></div>
+      <button type="button" class="btn btn-ghost cm-more-btn" id="cmMore" hidden>Show more comments</button>
+      <p class="fine-print cm-rules">Be kind and keep it about the film. No account needed: comments are tied to this browser, so you can edit or delete yours here. MANA CINEMA can hide comments that break these rules.</p>
+    </div>`;
+  sec.hidden = false;
+  $("cmComposeSlot").innerHTML = composerHTML({ label: "Add a comment…" });
+  const compose = $("cmComposeSlot").querySelector("form");
+  wireComposer(compose, {
+    onSubmit: async ({ text, name }) => {
+      const res = await api(`movies/${Number(film.id)}/comments`, { method: "POST", body: { name, text } });
+      cm.items.unshift(res.comment);
+      cm.total++;
+      $("commentList").prepend(commentEl(res.comment));   // your own comment shows first until the page reloads
+      cmCountText();
+      cmEmpty();
+      icons();
+      toast("Comment posted");
+    },
+    onCancel: () => compose.querySelector(".cm-input").blur(),
+  });
+  $("cmSort").addEventListener("change", e => { cm.sort = e.target.value; loadComments(); });
+  $("cmMore").addEventListener("click", () => loadComments({ more: true }));
+  $("commentList").addEventListener("click", e => {
+    const btn = e.target.closest("[data-act]");
+    if (btn && !btn.closest("form")) cmAction(btn.dataset.act, btn);
+  });
+  icons();
+  loadComments();
+  return true;
+}
+
 // ---------- Sources & notes ----------
 function renderSources() {
   const sec = $("sources");
@@ -1285,6 +1614,7 @@ function renderPage() {
   renderCollections({ hasNumbers, hasSources });
   renderRatings();
   renderReviews();
+  const hasComments = renderComments();
   renderMore();
   // Totals-only films have no day-by-day content to jump to; their header button goes to the key numbers
   renderHeader([
@@ -1293,6 +1623,7 @@ function renderPage() {
     !isTotalsOnly(film) && ["collections", "Day by day"],
     ["ratings", "Ratings"],
     isReleased(film) && ["reviews", "Reviews"],
+    hasComments && ["comments", "Comments"],
     hasSources && ["sources", "Sources"],
   ].filter(Boolean), { hasNumbers });
   icons();

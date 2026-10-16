@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css?v=7">
-  <link rel="stylesheet" href="css/admin.css?v=5">
+  <link rel="stylesheet" href="css/admin.css?v=6">
 </head>
 <body class="admin-page">
 
@@ -40,6 +40,7 @@
         <button type="button" data-view="films"><i data-lucide="film"></i> Films</button>
         <button type="button" data-view="collections"><i data-lucide="bar-chart-3"></i> Collections</button>
         <button type="button" data-view="ratings"><i data-lucide="star"></i> Ratings</button>
+        <button type="button" data-view="comments" data-online hidden><i data-lucide="messages-square"></i> Comments</button>
         <button type="button" data-view="messages"><i data-lucide="inbox"></i> Messages <span class="nav-badge" id="msgBadge" hidden></span></button>
         <button type="button" data-view="settings"><i data-lucide="settings"></i> Settings</button>
       </nav>
@@ -273,6 +274,21 @@
         </div>
       </section>
 
+      <!-- Comments (server only) -->
+      <section class="admin-view" id="view-comments" aria-labelledby="viewTitle" hidden>
+        <div class="panel">
+          <div class="panel-title"><h2><i data-lucide="messages-square"></i>Audience comments</h2><small id="cmCount"></small></div>
+          <p class="muted panel-copy">Visitors comment on each film's page, like on YouTube. Pin one comment per film, heart the good ones, hide or delete the rest, and reply as MANA CINEMA.</p>
+          <div class="admin-toolbar filter-bar" id="cmFilters">
+            <div class="field picker"><label for="cmFilm">Film</label><select id="cmFilm"></select></div>
+            <label class="search"><span class="sr-only">Search comments</span><i data-lucide="search" class="search-icon"></i>
+              <input type="search" id="cmSearch" placeholder="Search name or comment"></label>
+            <label class="check"><input type="checkbox" id="cmHiddenOnly"> Hidden only</label>
+          </div>
+        </div>
+        <div class="message-list" id="cmList"></div>
+      </section>
+
       <!-- Messages -->
       <section class="admin-view" id="view-messages" aria-labelledby="viewTitle" hidden>
         <div class="admin-toolbar">
@@ -321,6 +337,7 @@
               <div class="settings-actions">
                 <button type="button" class="btn btn-ghost btn-sm" data-reset="films"><i data-lucide="film"></i> Restore original films and collections</button>
                 <button type="button" class="btn btn-ghost btn-sm danger" data-reset="reviews"><i data-lucide="trash-2"></i> Delete all audience reviews</button>
+                <button type="button" class="btn btn-ghost btn-sm danger" data-reset="comments" data-online hidden><i data-lucide="trash-2"></i> Delete all comments</button>
                 <button type="button" class="btn btn-ghost btn-sm danger" data-reset="messages"><i data-lucide="trash-2"></i> Delete all messages</button>
               </div>
             </div>
@@ -412,6 +429,6 @@
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" integrity="sha384-ieG+IKD0d/ZPXyCBTMVAbqsQdns8QGJR/e26WMw7M4fkaI/rHcS/YIoi+ah9WGge" crossorigin="anonymous"></script>
   <script src="js/ui.js?v=4"></script>
   <script src="js/boxoffice.js?v=5"></script>
-  <script src="js/admin.js?v=5"></script>
+  <script src="js/admin.js?v=6"></script>
 </body>
 </html>

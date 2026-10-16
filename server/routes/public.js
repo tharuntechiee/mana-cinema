@@ -9,11 +9,20 @@
 //   POST /api/movies/:id/reviews      rate a film: { name, stars, text } (one per visitor, a new one replaces it)
 //   GET  /api/people/:id              one person and every film they're credited on
 //   POST /api/messages                the feedback form: { name, email, topic, movieId, message }
+//
+// Comments (YouTube-style; a visitor's own are marked "mine")
+//   GET    /api/movies/:id/comments   ?sort=top|new&offset=0&limit=20 -> { total, threads, hasMore, comments }
+//   POST   /api/movies/:id/comments   { name, text, parentId? }  (parentId: reply to that comment's thread)
+//   GET    /api/comments/:id/replies  a thread's replies, oldest first
+//   PATCH  /api/comments/:id          { text }  edit your own
+//   DELETE /api/comments/:id          delete your own (and its replies)
+//   PUT    /api/comments/:id/vote     { vote: 1 | -1 | 0 }  like, dislike, or take it back
 import express from "express";
 import { rateLimit } from "express-rate-limit";
 import { db, readFilms, readFilm, readCredits, reviewOut, nowISO, todayIST, currentFilmsVersion } from "../db.js";
 import { reviewerFrom, ensureVisitor } from "../auth.js";
 import { reviewProblem, messageProblem, NAME_MAX } from "../validate.js";
+import { listComments, listReplies, addComment, editComment, removeComment, voteComment, commentProblem } from "../comments.js";
 
 export const publicApi = express.Router();
 
@@ -125,4 +134,50 @@ publicApi.post("/messages", limit(15, 10, "Too many messages from here. Try agai
     String(b.name).trim(), String(b.email ?? "").trim() || null, String(b.topic ?? "").trim() || null,
     movieId, String(b.message).trim(), nowISO());
   res.status(201).json({ ok: true });
+});
+
+// ---------- Comments ----------
+const filmExists = id => Boolean(id && db.prepare("SELECT 1 FROM movies WHERE id = ?").get(id));
+const answer = (res, out, ok = 200) => (out.error ? res.status(out.status || 400).json({ error: out.error }) : res.status(ok).json(out));
+
+publicApi.get("/movies/:id/comments", (req, res) => {
+  const id = filmId(req);
+  if (!filmExists(id)) return res.status(404).json({ error: "That film doesn't exist." });
+  const sort = req.query.sort === "new" ? "new" : "top";
+  res.json(listComments(id, { viewer: reviewerFrom(req), sort, offset: Number(req.query.offset) || 0, limit: Number(req.query.limit) || 20 }));
+});
+
+publicApi.post("/movies/:id/comments", limit(10, 20, "You're commenting very fast. Wait a few minutes and try again."), (req, res) => {
+  const id = filmId(req);
+  if (!filmExists(id)) return res.status(404).json({ error: "That film doesn't exist." });
+  const problem = commentProblem(req.body);
+  if (problem) return res.status(400).json({ error: problem });
+  const parentId = req.body.parentId === undefined || req.body.parentId === null ? null : Number(req.body.parentId);
+  if (parentId !== null && !Number.isSafeInteger(parentId)) return res.status(400).json({ error: "That comment isn't valid." });
+  answer(res, addComment({ movieId: id, parentId, viewer: ensureVisitor(req, res), name: req.body.name, text: req.body.text }), 201);
+});
+
+publicApi.get("/comments/:id/replies", (req, res) => {
+  const id = /^\d{1,15}$/.test(req.params.id) ? Number(req.params.id) : null;
+  if (!id) return res.status(404).json({ error: "That comment was deleted." });
+  res.json({ replies: listReplies(id, { viewer: reviewerFrom(req) }) });
+});
+
+publicApi.patch("/comments/:id", limit(10, 40, "Too many edits. Wait a few minutes and try again."), (req, res) => {
+  const id = /^\d{1,15}$/.test(req.params.id) ? Number(req.params.id) : null;
+  const problem = commentProblem(req.body, { needName: false });
+  if (problem) return res.status(400).json({ error: problem });
+  answer(res, editComment(id, reviewerFrom(req), req.body.text));
+});
+
+publicApi.delete("/comments/:id", (req, res) => {
+  const id = /^\d{1,15}$/.test(req.params.id) ? Number(req.params.id) : null;
+  answer(res, removeComment(id, reviewerFrom(req)));
+});
+
+publicApi.put("/comments/:id/vote", limit(10, 300, "Too many likes from here. Wait a few minutes."), (req, res) => {
+  const id = /^\d{1,15}$/.test(req.params.id) ? Number(req.params.id) : null;
+  const vote = req.body?.vote;
+  if (![1, -1, 0].includes(vote)) return res.status(400).json({ error: "Send { vote: 1 } to like, -1 to dislike, 0 to take it back." });
+  answer(res, voteComment(id, ensureVisitor(req, res), vote));
 });

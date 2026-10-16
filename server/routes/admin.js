@@ -11,8 +11,13 @@
 //   PATCH  /api/admin/messages/:id        { read }
 //   POST   /api/admin/messages/read-all
 //   DELETE /api/admin/messages/:id
-//   POST   /api/admin/restore             a backup file's contents (replaces films, reviews and messages)
-//   POST   /api/admin/reset/:what         films | reviews | messages
+//   GET    /api/admin/comments            every comment and reply (hidden ones too)
+//   POST   /api/admin/comments            { movieId, parentId?, text }  comment or reply as MANA CINEMA
+//   PATCH  /api/admin/comments/:id        { pinned?, hearted?, hidden? }
+//   DELETE /api/admin/comments/:id        (and its replies)
+//   GET    /api/admin/backup              films, reviews, messages and comments as one file
+//   POST   /api/admin/restore             a backup file's contents (replaces films, reviews and messages, and comments if it has them)
+//   POST   /api/admin/reset/:what         films | reviews | messages | comments
 //   GET    /api/admin/sync                IMDb / TMDB / YouTube status and the running job
 //   POST   /api/admin/sync                { tasks: ["ratings", ...] or ["all"], movieIds? }
 import express from "express";
@@ -23,6 +28,7 @@ import { config } from "../env.js";
 import { filmProblem, tidyFilm, backupProblem } from "../validate.js";
 import { loadCatalogue, resetFilms } from "../seed.js";
 import { syncStatus, startSync, TASK_IDS } from "../sync/jobs.js";
+import { allComments, addComment, moderateComment, removeComment, commentProblem, exportComments, commentsBackupProblem, importComments, ADMIN_AUTHOR } from "../comments.js";
 
 export const adminApi = express.Router();
 const idParam = req => (/^\d{1,15}$/.test(req.params.id) ? Number(req.params.id) : null);
@@ -52,7 +58,7 @@ const allReviews = () => db.prepare("SELECT * FROM audience_reviews ORDER BY cre
 const allMessages = () => db.prepare("SELECT * FROM messages ORDER BY created_at DESC").all().map(messageOut);
 
 adminApi.get("/data", (req, res) => {
-  res.json({ movies: readFilms(), reviews: allReviews(), messages: allMessages() });
+  res.json({ movies: readFilms(), reviews: allReviews(), messages: allMessages(), comments: allComments() });
 });
 
 // ---------- Films ----------
@@ -116,13 +122,44 @@ adminApi.delete("/messages/:id", (req, res) => {
   res.json({ ok: true });
 });
 
-// ---------- Restore and reset ----------
+// ---------- Comments ----------
+const answer = (res, out, ok = 200) => (out.error ? res.status(out.status || 400).json({ error: out.error }) : res.status(ok).json(out));
+
+adminApi.get("/comments", (req, res) => {
+  res.json({ comments: allComments() });
+});
+
+adminApi.post("/comments", (req, res) => {
+  const movieId = Number(req.body?.movieId);
+  if (!Number.isInteger(movieId) || !db.prepare("SELECT 1 FROM movies WHERE id = ?").get(movieId)) return res.status(404).json({ error: "That film doesn't exist." });
+  const problem = commentProblem(req.body, { needName: false });
+  if (problem) return res.status(400).json({ error: problem });
+  const parentId = req.body.parentId === undefined || req.body.parentId === null ? null : Number(req.body.parentId);
+  answer(res, addComment({ movieId, parentId, viewer: ADMIN_AUTHOR, text: req.body.text, admin: true }), 201);
+});
+
+adminApi.patch("/comments/:id", (req, res) => {
+  const patch = req.body || {};
+  if (!["pinned", "hearted", "hidden"].some(k => typeof patch[k] === "boolean")) return res.status(400).json({ error: "Send pinned, hearted or hidden as true or false." });
+  answer(res, moderateComment(idParam(req), patch));
+});
+
+adminApi.delete("/comments/:id", (req, res) => {
+  answer(res, removeComment(idParam(req), null, { admin: true }));
+});
+
+// ---------- Backup, restore and reset ----------
+adminApi.get("/backup", (req, res) => {
+  const { catalog, version } = loadCatalogue();
+  res.json({ app: "mana-cinema", version, catalog, exportedAt: nowISO(), movies: readFilms(), reviews: allReviews(), messages: allMessages(), comments: exportComments() });
+});
+
 // All of the backup or nothing: one transaction. A backup made before the all-India catalogue
 // (no catalog number) gets the catalogue's newer films added back, as the browser version did.
 adminApi.post("/restore", (req, res) => {
   const data = req.body;
   const { movies: catalogue, catalog, version } = loadCatalogue();
-  const problem = backupProblem(data, { version });
+  const problem = backupProblem(data, { version }) || commentsBackupProblem(data.comments);
   if (problem) return res.status(400).json({ error: problem });
   const older = !(Number(data.catalog) >= catalog);
   const have = new Set(data.movies.map(m => m.id));
@@ -158,6 +195,7 @@ adminApi.post("/restore", (req, res) => {
       addMessage.run(Number.isSafeInteger(m.id) ? m.id : null, String(m.name || "Anonymous"), String(m.email || "") || null,
         String(m.topic || "") || null, Number(m.movieId) || null, String(m.message || ""), Number(Boolean(m.read)), String(m.at || nowISO()));
     }
+    if (Array.isArray(data.comments)) importComments(data.comments);   // older backups have none: the comments stay
     setMeta("catalog_version", older ? catalog : Number(data.catalog));
   });
   res.json({ ok: true, films: data.movies.length + added.length, added: added.length, reviews: data.reviews.length, messages: data.messages.length });
@@ -168,7 +206,12 @@ adminApi.post("/reset/:what", (req, res) => {
   if (what === "films") return res.json({ ok: true, films: resetFilms() });
   if (what === "reviews") return res.json({ ok: true, deleted: db.prepare("DELETE FROM audience_reviews").run().changes });
   if (what === "messages") return res.json({ ok: true, deleted: db.prepare("DELETE FROM messages").run().changes });
-  res.status(404).json({ error: "Reset films, reviews or messages." });
+  if (what === "comments") {   // counted first: replies go through the cascade, which changes() leaves out
+    const deleted = db.prepare("SELECT COUNT(*) AS n FROM comments").get().n;
+    db.exec("DELETE FROM comments");
+    return res.json({ ok: true, deleted });
+  }
+  res.status(404).json({ error: "Reset films, reviews, messages or comments." });
 });
 
 // ---------- IMDb, TMDB and YouTube ----------

@@ -71,6 +71,29 @@ try {
   check((await call("POST", "/api/messages", { name: "", message: "" })).status === 400, "empty feedback is refused");
   check((await call("POST", "/api/messages", { name: "X", message: "Y" }, { origin: "https://evil.example" })).status === 403, "other websites can't post");
 
+  // Comments
+  const c1 = await call("POST", "/api/movies/10/comments", { name: "Check", text: "Loved the climax" }, { asVisitor: true });
+  check(c1.status === 201 && c1.json.comment.mine === true, "a visitor can comment");
+  const other = await call("POST", "/api/movies/10/comments", { name: "Other", text: "Interval block!" });
+  const otherCookie = other.set.map(c => c.split(";")[0]).join("; ");
+  const reply = await call("POST", "/api/movies/10/comments", { name: "Other", text: "Same here", parentId: c1.json.comment.id });
+  check(reply.status === 201 && reply.json.comment.parentId === c1.json.comment.id, "anyone can reply");
+  const nested = await call("POST", "/api/movies/10/comments", { name: "Third", text: "@Other yes", parentId: reply.json.comment.id });
+  check(nested.json?.comment.parentId === c1.json.comment.id, "a reply to a reply joins the thread");
+  check((await call("POST", "/api/movies/10/comments", { name: "MANA CINEMA", text: "fake" })).status === 400, "visitors can't post as MANA CINEMA");
+  check((await call("POST", "/api/movies/10/comments", { text: "   " })).status === 400, "empty comments are refused");
+  const liked = await call("PUT", `/api/comments/${c1.json.comment.id}/vote`, { vote: 1 }, { asVisitor: true });
+  check(liked.json?.likes === 1 && liked.json.myVote === 1, "a visitor can like a comment");
+  check((await call("PUT", `/api/comments/${c1.json.comment.id}/vote`, { vote: 1 }, { asVisitor: true })).json?.likes === 1, "liking twice still counts once");
+  const page = (await call("GET", "/api/movies/10/comments?sort=top", undefined, { asVisitor: true })).json;
+  check(page.total === 4 && page.threads === 2 && page.comments[0].id === c1.json.comment.id && page.comments[0].replyCount === 2, "Top comments: most liked first, with reply counts");
+  check((await call("GET", "/api/movies/10/comments?sort=new")).json.comments[0].text === "Interval block!", "Newest first");
+  check((await call("GET", `/api/comments/${c1.json.comment.id}/replies`)).json.replies.map(r => r.text).join("|") === "Same here|@Other yes", "replies come oldest first");
+  const editedComment = await call("PATCH", `/api/comments/${c1.json.comment.id}`, { text: "Loved the climax!!" }, { asVisitor: true });
+  check(editedComment.json?.comment.editedAt && editedComment.json.comment.text === "Loved the climax!!", "a visitor can edit their own comment");
+  check((await call("PATCH", `/api/comments/${c1.json.comment.id}`, { text: "hacked" })).status === 403, "nobody else can edit it");
+  check((await call("DELETE", `/api/comments/${c1.json.comment.id}`)).status === 403, "nobody else can delete it");
+
   // Admin
   check((await call("GET", "/api/admin/data")).status === 401, "admin data needs sign-in");
   check((await call("POST", "/api/admin/login", { password: "wrong" })).status === 401, "wrong password is refused");
@@ -95,12 +118,30 @@ try {
   check(!/"Better"/.test((await call("GET", "/api/bootstrap.js")).text), "hidden reviews leave the website");
   check((await call("PATCH", `/api/admin/messages/${data.messages[0].id}`, { read: true }, { auth: true })).json?.message.read === true, "admin marks a message read");
 
+  // Comment moderation
+  const threadId = c1.json.comment.id;
+  check((await call("PATCH", `/api/admin/comments/${threadId}`, { pinned: true, hearted: true }, { auth: true })).json?.comment.pinned === true, "admin pins and hearts a comment");
+  check((await call("GET", "/api/movies/10/comments?sort=new")).json.comments[0].id === threadId, "a pinned comment stays on top");
+  check((await call("PATCH", `/api/admin/comments/${reply.json.comment.id}`, { pinned: true }, { auth: true })).status === 400, "replies can't be pinned");
+  const official = await call("POST", "/api/admin/comments", { movieId: 10, parentId: threadId, text: "Thanks for watching!" }, { auth: true });
+  check(official.status === 201 && official.json.comment.byAdmin && official.json.comment.name === "MANA CINEMA", "admin replies as MANA CINEMA");
+  const otherId = (await call("GET", "/api/movies/10/comments?sort=new")).json.comments.find(c => c.text === "Interval block!").id;
+  await call("PATCH", `/api/admin/comments/${otherId}`, { hidden: true }, { auth: true });
+  check(!(await call("GET", "/api/movies/10/comments")).text.includes("Interval block!"), "a hidden comment leaves the page");
+  const authorView = await fetch(`${base}/api/movies/10/comments`, { headers: { Cookie: otherCookie } }).then(r => r.json());
+  check(authorView.comments.some(c => c.id === otherId && c.hidden), "its author still sees it, marked hidden");
+  check((await call("GET", "/api/admin/comments", undefined, { auth: true })).json?.comments.length === 5, "admin sees every comment");
+
   // Backup round trip
-  const backup = { app: "mana-cinema", version: 2, catalog: 3, exportedAt: new Date().toISOString(), ...(await call("GET", "/api/admin/data", undefined, { auth: true })).json };
+  const backup = (await call("GET", "/api/admin/backup", undefined, { auth: true })).json;
+  check(backup.comments?.length === 5 && backup.comments.some(c => c.votes?.length === 1), "the backup has comments with their likes");
   const restored = await call("POST", "/api/admin/restore", backup, { auth: true });
   check(restored.status === 200 && restored.json.films === films.length, "backup restores");
   const after = (await call("GET", "/api/admin/data", undefined, { auth: true })).json;
   check(JSON.stringify(after.movies.find(m => m.id === 10)) === JSON.stringify(backup.movies.find(m => m.id === 10)), "a restored film is identical");
+  const backupAgain = (await call("GET", "/api/admin/backup", undefined, { auth: true })).json;
+  check(JSON.stringify(backupAgain.comments) === JSON.stringify(backup.comments), "restored comments and likes are identical");
+  check((await call("POST", "/api/admin/reset/comments", undefined, { auth: true })).json?.deleted === 5, "all comments can be deleted");
   check((await call("POST", "/api/admin/restore", { app: "nope" }, { auth: true })).status === 400, "a bad backup is refused");
   check((await call("POST", "/api/admin/reset/films", undefined, { auth: true })).json?.ok === true, "original films can be restored");
   const resetOg = (await call("GET", "/api/movies/10")).json.movie;

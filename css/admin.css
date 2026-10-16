@@ -533,3 +533,14 @@ input:user-invalid:not(:focus) { border-color: var(--danger); }   /* own rule: o
   .lang-tile { padding: 10px 8px; }
   .lang-tile span { font-size: .8125rem; }
 }
+
+/* Comments moderation (server only): cards like the messages, with an inline reply box */
+.cm-card.is-hidden { opacity: .72; }
+.cm-card .message-head a { color: var(--text-soft); text-decoration: underline; text-underline-offset: 3px; }
+.cm-context { font-size: var(--fs-label); border-left: 2px solid var(--border-strong); padding-left: 10px; overflow-wrap: anywhere; }
+.cm-body { white-space: pre-line; overflow-wrap: anywhere; line-height: 1.6; }
+.cm-reply-form { display: grid; gap: 10px; padding-top: 6px; }
+.cm-reply-form[hidden] { display: none; }
+.cm-reply-form textarea { width: 100%; resize: vertical; }
+.cm-reply-actions { display: flex; gap: 8px; justify-content: flex-end; }
+#cmShowMore { justify-self: start; }

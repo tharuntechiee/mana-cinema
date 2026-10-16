@@ -9,6 +9,7 @@
 //   people, credits   cast and crew (IMDb's principal cast and crew, or TMDB's full credits)
 //   trailers          the film's YouTube trailer with its views and likes
 //   audience_reviews  visitors' star ratings and reviews
+//   comments          YouTube-style comments and replies, with comment_votes (likes and dislikes)
 //   messages          the website's feedback form
 //   admin_sessions, sync_runs, meta
 import "./env.js";
@@ -117,6 +118,31 @@ CREATE TABLE IF NOT EXISTS audience_reviews (
   UNIQUE (movie_id, reviewer)
 );
 CREATE INDEX IF NOT EXISTS audience_reviews_movie ON audience_reviews (movie_id, created_at);
+
+-- YouTube-style comments: threads one level deep (a reply to a reply joins the same thread)
+CREATE TABLE IF NOT EXISTS comments (
+  id         INTEGER PRIMARY KEY,
+  movie_id   INTEGER NOT NULL,               -- no foreign key, like audience_reviews
+  parent_id  INTEGER REFERENCES comments (id) ON DELETE CASCADE,   -- NULL = a top-level comment
+  author     TEXT    NOT NULL,               -- hash of the visitor's cookie, or 'admin'
+  name       TEXT    NOT NULL,
+  body       TEXT    NOT NULL,
+  is_admin   INTEGER NOT NULL DEFAULT 0,     -- posted by MANA CINEMA from the admin portal
+  pinned     INTEGER NOT NULL DEFAULT 0,     -- one per film, top-level only
+  hearted    INTEGER NOT NULL DEFAULT 0,     -- "hearted by MANA CINEMA"
+  hidden     INTEGER NOT NULL DEFAULT 0,     -- hidden by a moderator: only its author still sees it
+  created_at TEXT    NOT NULL,
+  edited_at  TEXT
+);
+CREATE INDEX IF NOT EXISTS comments_thread ON comments (movie_id, parent_id, created_at);
+CREATE INDEX IF NOT EXISTS comments_parent ON comments (parent_id);
+
+CREATE TABLE IF NOT EXISTS comment_votes (
+  comment_id INTEGER NOT NULL REFERENCES comments (id) ON DELETE CASCADE,
+  voter      TEXT    NOT NULL,               -- hash of the visitor's cookie
+  vote       INTEGER NOT NULL CHECK (vote IN (-1, 1)),
+  PRIMARY KEY (comment_id, voter)
+) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS messages (
   id         INTEGER PRIMARY KEY,
@@ -373,6 +399,7 @@ function writeTrailer(movieId, trailer, origin) {
 // Deletes a film with its collections, critics, IMDb rating, credits, trailer and audience reviews
 export function deleteFilm(id) {
   return tx(() => {
+    db.prepare("DELETE FROM comments WHERE movie_id = ?").run(id);
     const reviews = db.prepare("DELETE FROM audience_reviews WHERE movie_id = ?").run(id).changes;
     const films = db.prepare("DELETE FROM movies WHERE id = ?").run(id).changes;
     db.exec("DELETE FROM people WHERE id NOT IN (SELECT person_id FROM credits)");
