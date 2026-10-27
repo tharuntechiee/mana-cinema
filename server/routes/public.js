@@ -21,7 +21,7 @@
 import express from "express";
 import { rateLimit } from "express-rate-limit";
 import { db, readFilms, readFilm, readCredits, reviewOut, nowISO, todayIST, currentFilmsVersion } from "../db.js";
-import { reviewerFrom, ensureVisitor } from "../auth.js";
+import { viewerFrom, ensureViewer, userFrom, userOut, postingProblem, signInMethods } from "../accounts.js";
 import { reviewProblem, messageProblem, NAME_MAX } from "../validate.js";
 import { listComments, listReplies, addComment, editComment, removeComment, voteComment, commentProblem } from "../comments.js";
 
@@ -54,9 +54,10 @@ const limit = (minutes, max, error) => rateLimit({
 });
 
 publicApi.get("/bootstrap.js", (req, res) => {
-  const reviews = JSON.stringify(visibleReviews(reviewerFrom(req)));
+  const reviews = JSON.stringify(visibleReviews(viewerFrom(req)));
   res.type("application/javascript").set("Cache-Control", "no-store");
-  res.send(`window.MANA_SERVER = {"generatedAt":${JSON.stringify(nowISO())},"attribution":${JSON.stringify(ATTRIBUTION)},"movies":${filmsJSON()},"reviews":${reviews}};\n`);
+  const me = JSON.stringify(userOut(userFrom(req))), signIn = JSON.stringify(signInMethods());
+  res.send(`window.MANA_SERVER = {"generatedAt":${JSON.stringify(nowISO())},"attribution":${JSON.stringify(ATTRIBUTION)},"me":${me},"signIn":${signIn},"movies":${filmsJSON()},"reviews":${reviews}};\n`);
 });
 
 publicApi.get("/health", (req, res) => {
@@ -86,7 +87,7 @@ publicApi.get("/movies/:id/credits", (req, res) => {
 publicApi.get("/movies/:id/reviews", (req, res) => {
   const id = filmId(req);
   if (!id) return res.status(404).json({ error: "That film doesn't exist." });
-  res.json({ reviews: visibleReviews(reviewerFrom(req), id) });
+  res.json({ reviews: visibleReviews(viewerFrom(req), id) });
 });
 
 publicApi.post("/movies/:id/reviews", limit(15, 30, "Too many ratings from here. Try again in a few minutes."), (req, res) => {
@@ -96,8 +97,11 @@ publicApi.post("/movies/:id/reviews", limit(15, 30, "Too many ratings from here.
   if (!isReleased(film)) return res.status(400).json({ error: "Ratings open on release day." });
   const problem = reviewProblem(req.body);
   if (problem) return res.status(400).json({ error: problem });
-  const reviewer = ensureVisitor(req, res);
-  const name = String(req.body.name ?? "").trim().slice(0, NAME_MAX) || "Anonymous";
+  const denied = postingProblem(req, "rate this film");
+  if (denied) return res.status(denied.status).json(denied);
+  const reviewer = ensureViewer(req, res);
+  // Signed in, a review carries the account's name
+  const name = userFrom(req)?.name || String(req.body.name ?? "").trim().slice(0, NAME_MAX) || "Anonymous";
   const stars = Number(req.body.stars), text = String(req.body.text ?? "").trim(), at = nowISO();
   const old = db.prepare("SELECT id FROM audience_reviews WHERE movie_id = ? AND reviewer = ?").get(id, reviewer);
   // Editing doesn't undo a moderator's hide
@@ -145,7 +149,7 @@ publicApi.get("/movies/:id/comments", (req, res) => {
   const id = filmId(req);
   if (!filmExists(id)) return res.status(404).json({ error: "That film doesn't exist." });
   const sort = req.query.sort === "new" ? "new" : "top";
-  res.json(listComments(id, { viewer: reviewerFrom(req), sort, offset: Number(req.query.offset) || 0, limit: Number(req.query.limit) || 20 }));
+  res.json(listComments(id, { viewer: viewerFrom(req), sort, offset: Number(req.query.offset) || 0, limit: Number(req.query.limit) || 20 }));
 });
 
 publicApi.post("/movies/:id/comments", limit(10, 20, "You're commenting very fast. Wait a few minutes and try again."), (req, res) => {
@@ -155,32 +159,36 @@ publicApi.post("/movies/:id/comments", limit(10, 20, "You're commenting very fas
   if (problem) return res.status(400).json({ error: problem });
   const parentId = req.body.parentId === undefined || req.body.parentId === null ? null : Number(req.body.parentId);
   if (parentId !== null && !Number.isSafeInteger(parentId)) return res.status(400).json({ error: "That comment isn't valid." });
-  answer(res, addComment({ movieId: id, parentId, viewer: ensureVisitor(req, res), name: req.body.name, text: req.body.text }), 201);
+  const denied = postingProblem(req, "comment");
+  if (denied) return res.status(denied.status).json(denied);
+  answer(res, addComment({ movieId: id, parentId, viewer: ensureViewer(req, res), name: userFrom(req)?.name || req.body.name, text: req.body.text }), 201);
 });
 
 publicApi.get("/comments/:id/replies", (req, res) => {
   const id = /^\d{1,15}$/.test(req.params.id) ? Number(req.params.id) : null;
   if (!id) return res.status(404).json({ error: "That comment was deleted." });
-  res.json({ replies: listReplies(id, { viewer: reviewerFrom(req) }) });
+  res.json({ replies: listReplies(id, { viewer: viewerFrom(req) }) });
 });
 
 publicApi.patch("/comments/:id", limit(10, 40, "Too many edits. Wait a few minutes and try again."), (req, res) => {
   const id = /^\d{1,15}$/.test(req.params.id) ? Number(req.params.id) : null;
   const problem = commentProblem(req.body, { needName: false });
   if (problem) return res.status(400).json({ error: problem });
-  answer(res, editComment(id, reviewerFrom(req), req.body.text));
+  answer(res, editComment(id, viewerFrom(req), req.body.text));
 });
 
 publicApi.delete("/comments/:id", (req, res) => {
   const id = /^\d{1,15}$/.test(req.params.id) ? Number(req.params.id) : null;
-  answer(res, removeComment(id, reviewerFrom(req)));
+  answer(res, removeComment(id, viewerFrom(req)));
 });
 
 publicApi.put("/comments/:id/vote", limit(10, 300, "Too many likes from here. Wait a few minutes."), (req, res) => {
   const id = /^\d{1,15}$/.test(req.params.id) ? Number(req.params.id) : null;
   const vote = req.body?.vote;
   if (![1, -1, 0].includes(vote)) return res.status(400).json({ error: "Send { vote: 1 } to like, -1 to dislike, 0 to take it back." });
-  answer(res, voteComment(id, ensureVisitor(req, res), vote));
+  const denied = postingProblem(req, "like comments");
+  if (denied) return res.status(denied.status).json(denied);
+  answer(res, voteComment(id, ensureViewer(req, res), vote));
 });
 
 // ---------- Search by cast and crew ----------

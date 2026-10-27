@@ -1057,6 +1057,8 @@ function renderRatings() {
 
 // ---------- Audience reviews ----------
 const STAR_WORDS = ["", "Poor", "Below average", "Good", "Very good", "Excellent"];
+// On a server with sign-in set up, rating needs an account (js/account.js)
+const needsSignIn = () => ONLINE && SIGN_IN_ON && !ME;
 
 function renderReviews() {
   const sec = $("reviews");
@@ -1078,18 +1080,23 @@ function renderReviews() {
             </div>
           </fieldset>
           <p class="form-error" id="rvError" role="alert"></p>
+          ${ME ? `<p class="posting-as">Posting as <strong>${esc(ME.name)}</strong> <button type="button" class="cm-btn" id="rvAccount">Change</button></p>`
+            : SIGN_IN_ON ? "" : `
           <div class="field">
             <label for="rvName">Name <span class="opt">(optional)</span></label>
             <input id="rvName" type="text" maxlength="${NAME_MAX}" autocomplete="nickname" placeholder="Anonymous">
-          </div>
+          </div>`}
           <div class="field">
             <label for="rvText">Review <span class="opt">(optional)</span></label>
             <textarea id="rvText" rows="4" maxlength="${REVIEW_MAX}" aria-describedby="rvCount" placeholder="What worked, what didn't?"></textarea>
             <p class="char-count" id="rvCount">0/${REVIEW_MAX}</p>
           </div>
           <p class="fine-print" id="rvHiddenNote" hidden>A moderator has hidden your review, so it isn't shown or counted. Posting again keeps it hidden.</p>
-          <button class="btn btn-primary" type="submit" id="rvSubmit">${icon("send")}<span>Post rating</span></button>
-          <p class="fine-print">${ONLINE ? "Everyone sees it once it's posted." : "Saved in this browser only."} One rating per film; posting again replaces yours.</p>
+          ${ME?.blocked ? `<p class="form-error">Your account can't post ratings. Use the feedback form if you think this is a mistake.</p>` : ""}
+          <button class="btn btn-primary" type="submit" id="rvSubmit"${ME?.blocked ? " disabled" : ""}>${icon(needsSignIn() ? "log-in" : "send")}<span>${needsSignIn() ? "Sign in to rate" : "Post rating"}</span></button>
+          <p class="fine-print">${!ONLINE ? "Saved in this browser only. One rating per film; posting again replaces yours."
+            : SIGN_IN_ON ? "One rating per person for each film, so the scores stay fair. Posting again replaces yours."
+            : "Everyone sees it once it's posted. One rating per film; posting again replaces yours."}</p>
         </form>
         <div class="review-list-wrap">
           <div class="panel-title"><h3 id="reviewListTitle">${icon("message-square")}What viewers say</h3><small id="reviewCount"></small></div>
@@ -1120,27 +1127,42 @@ function renderReviews() {
   const fill = () => {
     const mine = myReview(film.id);
     $("formTitle").textContent = mine ? "You rated this film" : "Rate this film";
-    $("rvSubmit").querySelector("span").textContent = mine ? "Update your rating" : "Post rating";
+    if (!needsSignIn()) $("rvSubmit").querySelector("span").textContent = mine ? "Update your rating" : "Post rating";
     $("rvHiddenNote").hidden = !(mine && mine.hidden);
     if (mine) {
       const input = $(`star${mine.stars}`);
       if (input) input.checked = true;
-      $("rvName").value = mine.name === "Anonymous" ? "" : mine.name;
+      if ($("rvName")) $("rvName").value = mine.name === "Anonymous" ? "" : mine.name;
       text.value = mine.text || "";
     }
     paint(checked());
     count();
   };
   fill();
+  // A rating typed before signing in comes back after the page reloads (not posted until you press Post)
+  const pending = typeof takePendingRating === "function" ? takePendingRating(film.id) : null;
+  if (pending && !needsSignIn()) {
+    const input = $(`star${pending.stars}`);
+    if (input) input.checked = true;
+    if (pending.text) text.value = pending.text;
+    paint(checked());
+    count();
+    $("rvSubmit").focus();
+  }
+  $("rvAccount")?.addEventListener("click", () => openAccount());
 
   form.addEventListener("submit", async e => {
     e.preventDefault();
     const submit = $("rvSubmit");
     if (submit.disabled) return;
+    if (needsSignIn()) {
+      keepPendingRating(film.id, { stars: checked(), text: text.value });
+      return openSignIn("Sign in to post your rating. What you've typed is kept.");
+    }
     submit.disabled = true;   // one post at a time while the server answers
     let res;
     try {
-      res = await submitReview(film, { name: $("rvName").value, stars: checked() || undefined, text: text.value });
+      res = await submitReview(film, { name: $("rvName")?.value || "", stars: checked() || undefined, text: text.value });
     } finally {
       submit.disabled = false;
     }
@@ -1169,6 +1191,7 @@ function renderReviewList() {
             <div class="review-head">
               <strong class="review-name">${esc(r.name)}</strong>
               ${isMyReview(r) ? `<span class="you-badge">You</span>` : ""}
+              ${r.verified ? `<span class="verified-badge" title="Posted from a signed-in account: one rating per person">${icon("badge-check")}<span>Verified</span></span>` : ""}
               ${starsHTML(r.stars, { size: "sm" })}
               <time datetime="${esc(r.at)}">${esc(ago(r.at))}</time>
             </div>
@@ -1182,7 +1205,8 @@ function renderReviewList() {
 // ---------- Comments (server only) ----------
 // YouTube-style: comment, reply (threads one level deep), like or dislike, sort by Top or Newest, edit or
 // delete your own. MANA CINEMA's own replies are marked Official, and it can pin and heart comments.
-// Visitors need no account: the server knows them by a cookie. Without the server there are no comments.
+// With sign-in set up (js/account.js), posting, replying and liking need an account; reading doesn't.
+// Otherwise visitors are known by a cookie. Without the server there are no comments.
 const CM_MAX = 1500;
 const CM_NAME_MAX = 40;
 const CM_CLAMP = 420;   // longer comments start shortened, with "Read more"
@@ -1262,7 +1286,8 @@ function cmRedraw(c) {
   icons();
 }
 
-function composerHTML({ label, submit = "Comment", text = "", showName = true, cancel = true }) {
+// With sign-in set up, comments carry the account's name, so there's no name box
+function composerHTML({ label, submit = "Comment", text = "", showName = !SIGN_IN_ON, cancel = true }) {
   return `
     <form class="cm-form" novalidate>
       <textarea class="cm-input" rows="1" maxlength="${CM_MAX}" placeholder="${esc(label)}" aria-label="${esc(label)}">${esc(text)}</textarea>

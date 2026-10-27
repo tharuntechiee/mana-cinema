@@ -9,12 +9,17 @@ process.env.DATABASE_FILE = path.join(dir, "check.db");
 process.env.ADMIN_PASSWORD = "check-password-123";
 process.env.AUTO_SYNC_RATINGS = "false";
 process.env.IMAGE_CACHE_DIR = path.join(dir, "img");
+// Sign-in starts switched off whatever .env says; the accounts checks switch it on
+process.env.EMAIL_SENDER = "";
+process.env.GOOGLE_CLIENT_ID = "";
 
 // A stand-in for TMDB's image server: a tiny WebP, a slow answer, an HTML page and a too-large file
 const http = await import("node:http");
 const upstreamHits = {};
+let jwks = { keys: [] };   // a stand-in for Google's sign-in keys, at /certs
 const TINY_WEBP = Buffer.from("UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA=", "base64");
 const upstream = http.createServer((req, res) => {
+  if (req.url === "/certs") { res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "public, max-age=600" }); return res.end(JSON.stringify(jwks)); }
   const name = req.url.split("/").pop();
   upstreamHits[name] = (upstreamHits[name] || 0) + 1;
   if (name.startsWith("slowfile")) return setTimeout(() => { res.writeHead(200, { "Content-Type": "image/webp" }); res.end(TINY_WEBP); }, 300);
@@ -38,14 +43,16 @@ const base = `http://localhost:${server.address().port}`;
 
 let failures = 0, cookie = "", visitor = "";
 const check = (ok, what) => { console.log(`${ok ? "ok  " : "FAIL"}  ${what}`); if (!ok) failures++; };
-async function call(method, url, body, { auth = false, asVisitor = false, origin } = {}) {
+async function call(method, url, body, { auth = false, asVisitor = false, origin, jar } = {}) {
   const headers = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (auth) headers.Cookie = cookie;
   if (asVisitor && visitor) headers.Cookie = visitor;
+  if (jar) headers.Cookie = Object.entries(jar).map(([k, v]) => `${k}=${v}`).join("; ");
   if (origin) headers.Origin = origin;
   const res = await fetch(base + url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
   const set = res.headers.getSetCookie?.() || [];
+  if (jar) for (const c of set) { const [kv] = c.split(";"); const i = kv.indexOf("="); const v = kv.slice(i + 1); if (v && !/Expires=Thu, 01 Jan 1970/i.test(c)) jar[kv.slice(0, i)] = v; else delete jar[kv.slice(0, i)]; }
   const text = await res.text();
   let json = null;
   try { json = JSON.parse(text); } catch {}
@@ -200,6 +207,153 @@ try {
   const resetOg = (await call("GET", "/api/movies/10")).json.movie;
   check(resetOg.boxOffice.days.length === 29 && resetOg.imdbId === "tt0000010", "reset brings back the researched figures and keeps the IMDb ID");
   check((await call("GET", "/api/admin/sync", undefined, { auth: true })).json?.tasks.length === 6, "sync status lists the six tasks");
+  // ---------- Viewers' accounts ----------
+  const { config } = await import("./env.js");
+  const nodeCrypto = await import("node:crypto");
+  const keyPair = () => nodeCrypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const google = keyPair(), stranger = keyPair();
+  jwks = { keys: [{ ...google.publicKey.export({ format: "jwk" }), kid: "check-key", alg: "RS256", use: "sig" }] };
+  const CLIENT = "check-client.apps.googleusercontent.com";
+  const googleToken = (claims, { key = google.privateKey, kid = "check-key" } = {}) => {
+    const enc = o => Buffer.from(JSON.stringify(o)).toString("base64url");
+    const now = Math.floor(Date.now() / 1000);
+    const body = `${enc({ alg: "RS256", kid, typ: "JWT" })}.${enc({ iss: "https://accounts.google.com", aud: CLIENT, iat: now, exp: now + 3600, ...claims })}`;
+    return `${body}.${nodeCrypto.sign("sha256", Buffer.from(body), key).toString("base64url")}`;
+  };
+  // The test email sender prints the code; catch it here
+  let lastCode = "";
+  const log = console.log;
+  console.log = (...args) => { const m = /\[test email\].*: (\d{6})$/.exec(args.join(" ")); if (m) lastCode = m[1]; else log(...args); };
+
+  // A visitor rates a film before sign-in is set up...
+  const early = {};
+  check((await call("POST", "/api/movies/10/reviews", { name: "Early", stars: 2, text: "Before accounts" }, { jar: early })).status === 201, "before sign-in is set up, anyone can rate");
+  check((await call("POST", "/api/movies/10/comments", { name: "Early", text: "First!" }, { jar: early })).status === 201, "before sign-in is set up, anyone can comment");
+
+  // ...then sign-in is switched on
+  Object.assign(config, { emailSender: "console", googleClientId: CLIENT, googleJwksUrl: `http://localhost:${upstream.address().port}/certs` });
+  const bootOff = (await call("GET", "/api/bootstrap.js")).text;
+  check(bootOff.includes(`"signIn":{"google":"${CLIENT}","email":{"test":true}}`) && bootOff.includes('"me":null'), "pages learn which sign-in methods are offered");
+  const anonRate = await call("POST", "/api/movies/10/reviews", { stars: 5 }, { jar: {} });
+  check(anonRate.status === 401 && anonRate.json.signIn === true, "with sign-in set up, rating needs an account");
+  check((await call("POST", "/api/movies/10/comments", { text: "hi" }, { jar: {} })).status === 401, "with sign-in set up, commenting needs an account");
+
+  // Email-code sign-in
+  check((await call("POST", "/api/auth/email/start", { email: "not-an-email" }, { jar: early })).status === 400, "something that isn't an email address is refused");
+  const started = await call("POST", "/api/auth/email/start", { email: " Ravi.Teja+films@Gmail.com " }, { jar: early });
+  check(started.status === 200 && /^\d{6}$/.test(lastCode), "a code is emailed");
+  check((await call("POST", "/api/auth/email/start", { email: "raviteja@gmail.com" }, { jar: early })).status === 429, "a second code within a minute is refused, even for the same Gmail written differently");
+  const wrong = String((Number(lastCode) + 1) % 1e6).padStart(6, "0");
+  const wrongTry = await call("POST", "/api/auth/email/verify", { email: "Ravi.Teja+films@gmail.com", code: wrong }, { jar: early });
+  check(wrongTry.status === 400 && /4 tries left/.test(wrongTry.json.error), "a wrong code is refused and counts a try");
+  const goodCode = lastCode;
+  const emailIn = await call("POST", "/api/auth/email/verify", { email: "raviteja@googlemail.com", code: goodCode }, { jar: early });
+  check(emailIn.status === 200 && emailIn.json.created === true && Boolean(early.mana_user), "the right code signs in and makes an account");
+  check((await call("POST", "/api/auth/email/verify", { email: "raviteja@gmail.com", code: goodCode }, { jar: {} })).status === 400, "a code works only once");
+  const emailUser = emailIn.json.user;
+  check(emailUser.method === "email" && emailUser.email === "raviteja@googlemail.com", "the account shows its email address");
+  check(!JSON.stringify(db.prepare("SELECT * FROM sign_in_codes").all()).includes(goodCode), "the database never keeps the code itself");
+
+  // What the visitor posted before signing in is now the account's
+  const claimed = (await call("GET", "/api/movies/10/reviews", undefined, { jar: early })).json.reviews.find(r => r.mine);
+  check(claimed?.verified === true && claimed.stars === 2, "a rating from before signing in moves to the account");
+  check((await call("GET", "/api/movies/10/comments?sort=new", undefined, { jar: early })).json.comments.some(c => c.mine && c.text === "First!"), "comments from before signing in move to the account");
+  const meBoot = (await call("GET", "/api/bootstrap.js", undefined, { jar: early })).text;
+  check(/"me":\{"id":\d+,"name":"raviteja","method":"email"/.test(meBoot), "pages know who is signed in");
+
+  // Renaming, rating as the account
+  check((await call("PATCH", "/api/me", { name: "Mana Cinema" }, { jar: early })).status === 400, "an account can't be named MANA CINEMA");
+  check((await call("PATCH", "/api/me", { name: "Ravi Teja Fan" }, { jar: early })).json?.user.name === "Ravi Teja Fan", "the account can be renamed");
+  const rated = await call("POST", "/api/movies/10/reviews", { name: "Someone else", stars: 4, text: "Rated as an account" }, { jar: early });
+  check(rated.status === 200 && rated.json.replaced && rated.json.review.name === "Ravi Teja Fan" && rated.json.review.verified, "an account's rating carries its name and replaces its earlier one");
+  const newest = (await call("GET", "/api/movies/10/comments?sort=new")).json.comments[0].id;
+  check((await call("PUT", `/api/comments/${newest}/vote`, { vote: 1 }, { jar: early })).json?.myVote === 1, "an account can like a comment");
+
+  // Google sign-in
+  const g = {};
+  const nonceOf = async jar => (await call("GET", "/api/auth/nonce", undefined, { jar })).json.nonce;
+  let nonce = await nonceOf(g);
+  check(typeof nonce === "string" && Boolean(g.mana_nonce), "Google sign-in starts with a one-time nonce");
+  const google401 = async (token, why) => check((await call("POST", "/api/auth/google", { credential: token }, { jar: { ...g } })).status === 401, why);
+  await google401(googleToken({ sub: "g-1", nonce, aud: "someone-else" }), "a Google token for another website is refused");
+  await google401(googleToken({ sub: "g-1", nonce, iss: "https://evil.example" }), "a token from another issuer is refused");
+  await google401(googleToken({ sub: "g-1", nonce, exp: Math.floor(Date.now() / 1000) - 3600 }), "an expired Google token is refused");
+  await google401(googleToken({ sub: "g-1", nonce }, { key: stranger.privateKey }), "a token signed with someone else's key is refused");
+  await google401(googleToken({ sub: "g-1", nonce: "wrong" }), "a token with the wrong nonce is refused");
+  await google401("not.a.token", "a damaged token is refused");
+  const gIn = await call("POST", "/api/auth/google", { credential: googleToken({ sub: "g-1", nonce, email: "fan@example.com", email_verified: true, given_name: "Priya" }) }, { jar: g });
+  check(gIn.status === 200 && gIn.json.created && gIn.json.user.name === "Priya" && gIn.json.user.email === "fan@example.com" && Boolean(g.mana_user), "a genuine Google token signs in");
+  check(!g.mana_nonce, "the nonce is used up");
+  const g2 = {};
+  nonce = await nonceOf(g2);
+  const gAgain = await call("POST", "/api/auth/google", { credential: googleToken({ sub: "g-1", nonce }) }, { jar: g2 });
+  check(gAgain.status === 200 && gAgain.json.created === false && gAgain.json.user.id === gIn.json.user.id, "signing in again finds the same account");
+  check((await call("POST", "/api/movies/10/reviews", { stars: 5 }, { jar: g })).status === 201, "a second person can rate the same film");
+  // One email address is one account
+  const g3 = {};
+  nonce = await nonceOf(g3);
+  const linked = await call("POST", "/api/auth/google", { credential: googleToken({ sub: "g-2", nonce, email: "RaviTeja@gmail.com", email_verified: true }) }, { jar: g3 });
+  check(linked.json?.created === false && linked.json.user.id === emailUser.id && linked.json.user.method === "google", "Google with the same verified address reaches the email-code account");
+  const g4 = {};
+  nonce = await nonceOf(g4);
+  const unverified = await call("POST", "/api/auth/google", { credential: googleToken({ sub: "g-3", nonce, email: "raviteja@gmail.com", email_verified: false }) }, { jar: g4 });
+  check(unverified.json?.created === true && unverified.json.user.id !== emailUser.id, "an address Google hasn't verified isn't linked to anyone's account");
+
+  // Admin: accounts and blocking
+  const users = (await call("GET", "/api/admin/users", undefined, { auth: true })).json?.users || [];
+  check(users.length === 3 && users.some(u => u.id === emailUser.id && u.ratings === 1 && u.comments === 1), "admin sees every account with its ratings");
+  check((await call("GET", "/api/admin/users")).status === 401, "accounts are admin-only");
+  check((await call("PATCH", `/api/admin/users/${emailUser.id}`, { blocked: true }, { auth: true })).json?.user.blocked === true, "admin blocks an account");
+  check(!(await call("GET", "/api/movies/10/reviews")).text.includes("Rated as an account"), "a blocked account's ratings are hidden");
+  check((await call("POST", "/api/movies/10/reviews", { stars: 1 }, { jar: early })).status === 403, "a blocked account can't rate");
+  await call("PATCH", `/api/admin/users/${emailUser.id}`, { blocked: false }, { auth: true });
+  check((await call("GET", "/api/movies/10/reviews")).text.includes("Rated as an account"), "unblocking shows the ratings again");
+
+  // Download, sign out, delete
+  const exported = await call("GET", "/api/me/export", undefined, { jar: early });
+  check(exported.json?.ratings.length === 1 && exported.json.comments.length === 1 && exported.json.likes.length === 1, "the viewer can download everything kept about them");
+  const second = {};
+  nonce = await nonceOf(second);
+  await call("POST", "/api/auth/google", { credential: googleToken({ sub: "g-1", nonce }) }, { jar: second });
+  await call("POST", "/api/auth/signout", { everywhere: true }, { jar: g });
+  check((await call("GET", "/api/me", undefined, { jar: { ...second } })).json.user === null, "signing out everywhere ends the other devices' sessions");
+  check((await call("DELETE", "/api/me", { confirm: "yes" }, { jar: early })).status === 400, "deleting needs DELETE typed");
+  check((await call("DELETE", "/api/me", { confirm: "DELETE" }, { jar: early })).status === 200, "a viewer can delete their account");
+  check(!(await call("GET", "/api/movies/10/reviews")).text.includes("Rated as an account") && (await call("GET", "/api/me", undefined, { jar: early })).json.user === null, "deleting removes the account, its session and its ratings");
+  check(db.prepare("SELECT COUNT(*) AS n FROM users").get().n === 2, "only the other accounts are left");
+  check((await fetch(`${base}/api/movies/10/reviews`, { method: "POST", headers: { "Content-Type": "application/json", "Sec-Fetch-Site": "cross-site", Cookie: `mana_user=${g4.mana_user}` }, body: '{"stars":5}' })).status === 403, "another website's page can't post with a viewer's cookie");
+
+  // A real email through SMTP, to a stand-in mail server
+  const net = await import("node:net");
+  const mail = { auth: "", to: "", data: "" };
+  const smtpServer = net.createServer(sock => {
+    let inData = false;
+    const say = text => sock.write(`${text}\r\n`);
+    say("220 check ESMTP");
+    sock.on("data", chunk => {
+      for (const line of chunk.toString().split("\r\n").slice(0, -1)) {
+        if (inData) { if (line === ".") { inData = false; say("250 queued"); } else mail.data += `${line}\n`; continue; }
+        if (/^EHLO/i.test(line)) say("250-check\r\n250 AUTH PLAIN LOGIN");
+        else if (/^AUTH PLAIN/i.test(line)) { mail.auth = Buffer.from(line.split(" ")[2] || "", "base64").toString(); say("235 ok"); }
+        else if (/^RCPT TO/i.test(line)) { mail.to = line; say("250 ok"); }
+        else if (/^DATA/i.test(line)) { inData = true; say("354 go"); }
+        else if (/^QUIT/i.test(line)) sock.end("221 bye\r\n");
+        else say("250 ok");
+      }
+    });
+  }).listen(0);
+  await new Promise(r => smtpServer.once("listening", r));
+  Object.assign(config, { emailSender: "smtp", smtp: { host: "localhost", port: smtpServer.address().port, user: "site@example.com", pass: "app-password" }, mailFrom: "" });
+  const smtpSent = await call("POST", "/api/auth/email/start", { email: "smtp.fan@example.com" }, { jar: {} });
+  const mailed = /(\d{6}) is your MANA CINEMA sign-in code/.exec(mail.data)?.[1];
+  check(smtpSent.status === 200 && mail.to.includes("smtp.fan@example.com") && mail.auth.includes("site@example.com") && Boolean(mailed), "with SMTP set up, the code is really emailed");
+  check((await call("POST", "/api/auth/email/verify", { email: "smtp.fan@example.com", code: mailed }, { jar: {} })).status === 200, "the emailed code signs in");
+  config.smtp.pass = "";
+  check((await call("POST", "/api/auth/email/start", { email: "nobody@example.com" }, { jar: {} })).status === 502, "a mail problem is reported, not hidden");
+  smtpServer.close();
+
+  console.log = log;
+  Object.assign(config, { emailSender: "", googleClientId: "" });
   check((await call("POST", "/api/admin/logout", undefined, { auth: true })).status === 200, "admin signs out");
   check((await call("GET", "/api/admin/data", undefined, { auth: true })).status === 401, "signed-out cookie no longer works");
 } catch (err) {

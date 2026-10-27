@@ -8,6 +8,7 @@ import { ROOT } from "./db.js";
 import { config } from "./env.js";
 import { publicApi } from "./routes/public.js";
 import { adminApi } from "./routes/admin.js";
+import { accountApi } from "./routes/account.js";
 import { imageRoute } from "./images.js";
 
 export function createApp() {
@@ -32,6 +33,8 @@ export function createApp() {
   // Changes must come from this site's own pages, not from another website
   api.use((req, res, next) => {
     if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
+    // Browsers say where a request came from; another site's page is refused even without an Origin header
+    if (req.get("sec-fetch-site") === "cross-site") return res.status(403).json({ error: "Requests from other websites aren't allowed." });
     const origin = req.get("origin");
     if (origin) {
       let host = "";
@@ -42,6 +45,7 @@ export function createApp() {
   });
   api.use((req, res, next) => { res.set("Cache-Control", "no-store"); next(); });
   api.use("/admin", adminApi);
+  api.use(accountApi);
   api.use(publicApi);
   api.use((req, res) => res.status(404).json({ error: "There's no such API address." }));
   api.use((err, req, res, next) => {
@@ -56,7 +60,7 @@ export function createApp() {
   app.get("/img/:size/:file", imageRoute);
 
   // ---------- Website ----------
-  const PAGES = ["index.html", "film.html", "lists.html", "admin.html"];
+  const PAGES = ["index.html", "film.html", "lists.html", "admin.html", "privacy.html"];
   const page = name => (req, res) => res.set("Cache-Control", "no-cache").sendFile(path.join(ROOT, name));
   app.get("/", page("index.html"));
   for (const name of PAGES) app.get(`/${name}`, page(name));

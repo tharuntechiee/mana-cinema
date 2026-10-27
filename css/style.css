@@ -1384,3 +1384,60 @@ html.search-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .search-dialog[open] { animation: none; }
 }
+
+/* ---------- Sign-in and account (js/account.js) ---------- */
+.account-btn { flex: 0 0 auto; }
+.account-btn.btn { min-height: 42px; gap: 6px; }
+.account-btn.btn svg.lucide { width: 18px; height: 18px; }
+.account-btn.is-in { border-radius: 999px; font-weight: 700; font-size: var(--fs-small); background: var(--surface-3); }
+.account-dialog {
+  position: fixed; inset: 8vh auto auto 50%; translate: -50% 0; margin: 0; padding: 0;
+  width: min(440px, calc(100vw - 32px)); max-height: 84vh; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius-lg);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .55);
+}
+.account-dialog[open] { animation: rise .22s var(--ease); }
+.account-dialog::backdrop { background: rgba(0, 0, 0, .6); backdrop-filter: blur(3px); }
+.account-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 12px 14px 22px; border-bottom: 1px solid var(--border); }
+.account-head h2 { font-size: 1.125rem; }
+.account-body { display: grid; gap: 16px; padding: 20px 22px 22px; }
+.account-lead { color: var(--text-soft); font-size: var(--fs-small); line-height: 1.6; }
+.gsi-slot { display: grid; justify-items: center; gap: 8px; min-height: 44px; }
+.account-or { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: var(--fs-small); white-space: nowrap; }
+.account-or::before, .account-or::after { content: ""; flex: 1; height: 1px; background: var(--border-strong); }
+.code-form { display: grid; gap: 12px; }
+.code-form .field { margin: 0; }
+#codeInput { letter-spacing: .4em; font-size: 1.25rem; font-weight: 700; text-align: center; }
+.code-links { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; }
+#codeHint { margin-top: 6px; }
+.account-notice, .account-danger { font-size: var(--fs-small); color: var(--muted); line-height: 1.6; }
+.account-notice summary, .account-danger summary { cursor: pointer; color: var(--text-soft); font-weight: 600; }
+.account-notice p, .account-danger p { margin-top: 8px; }
+.account-danger { border-top: 1px solid var(--border); padding-top: 14px; }
+.account-danger form { display: grid; gap: 6px; margin-top: 10px; }
+.account-who { display: flex; align-items: center; gap: 12px; }
+.account-who .cm-avatar { width: 44px; height: 44px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 999px; background: var(--surface-3); font-weight: 700; }
+.account-who strong { display: block; }
+.account-who small { color: var(--muted); overflow-wrap: anywhere; }
+.account-actions { display: grid; gap: 8px; }
+.account-actions .btn { justify-content: flex-start; gap: 10px; }
+.account-actions svg.lucide { width: 18px; height: 18px; }
+.inline-row { display: flex; gap: 8px; }
+.inline-row input { flex: 1 1 auto; min-width: 0; }
+.btn-danger { background: var(--danger); color: #1a0505; border-color: transparent; }
+.btn-danger:hover { filter: brightness(1.08); }
+.posting-as { font-size: var(--fs-small); color: var(--text-soft); }
+.verified-badge { display: inline-flex; align-items: center; gap: 3px; color: var(--gold); font-size: var(--fs-label); font-weight: 600; }
+.verified-badge svg.lucide { width: 14px; height: 14px; }
+@media (max-width: 760px) {
+  .account-btn.btn span { display: none; }
+  .account-btn.btn { width: 42px; padding: 0; justify-content: center; }
+}
+/* Privacy notice page */
+.privacy { max-width: 760px; padding-top: calc(var(--nav-h, 72px) + 40px); padding-bottom: 64px; }
+.privacy h1 { font-size: clamp(1.75rem, 4vw, 2.5rem); margin-bottom: 6px; }
+.privacy-date { color: var(--muted); font-size: var(--fs-small); margin-bottom: 24px; }
+.privacy h2 { font-size: 1.125rem; margin: 28px 0 8px; }
+.privacy p, .privacy li { color: var(--text-soft); line-height: 1.7; }
+.privacy ul { padding-left: 20px; display: grid; gap: 8px; }
+.privacy-page .footer-bottom { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 24px 0; }

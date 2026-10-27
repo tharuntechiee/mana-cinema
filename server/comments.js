@@ -1,7 +1,7 @@
 // YouTube-style comments: anyone can comment on a film, reply, like or dislike, and edit or delete their own.
 // Threads are one level deep, as on YouTube: a reply to a reply joins the same thread (the page adds "@name").
 // The admin can pin one comment per film, heart comments, hide or delete them, and reply as MANA CINEMA.
-// Visitors are known by the same anonymous cookie as audience ratings (auth.js); there are no accounts.
+// Viewers are known by their account (accounts.js) when signed in, else by the anonymous cookie (auth.js).
 import { db, tx, nowISO } from "./db.js";
 
 export const COMMENT_MAX = 1500;

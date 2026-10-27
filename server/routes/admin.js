@@ -8,6 +8,8 @@
 //   DELETE /api/admin/movies/:id          delete a film and everything about it
 //   PATCH  /api/admin/reviews/:id         { hidden }
 //   DELETE /api/admin/reviews/:id
+//   GET    /api/admin/users               viewers' accounts, with how many ratings and comments each posted
+//   PATCH  /api/admin/users/:id           { blocked }  a blocked account can't post; its posts are hidden
 //   PATCH  /api/admin/messages/:id        { read }
 //   POST   /api/admin/messages/read-all
 //   DELETE /api/admin/messages/:id
@@ -28,6 +30,7 @@ import { config } from "../env.js";
 import { filmProblem, tidyFilm, backupProblem } from "../validate.js";
 import { loadCatalogue, resetFilms } from "../seed.js";
 import { syncStatus, startSync, TASK_IDS } from "../sync/jobs.js";
+import { allUsers, setBlocked } from "../accounts.js";
 import { allComments, addComment, moderateComment, removeComment, commentProblem, exportComments, commentsBackupProblem, importComments, ADMIN_AUTHOR } from "../comments.js";
 
 export const adminApi = express.Router();
@@ -99,6 +102,16 @@ adminApi.delete("/reviews/:id", (req, res) => {
   const changed = id ? db.prepare("DELETE FROM audience_reviews WHERE id = ?").run(id).changes : 0;
   if (!changed) return res.status(404).json({ error: "That review was already deleted." });
   res.json({ ok: true });
+});
+
+// ---------- Viewers' accounts ----------
+adminApi.get("/users", (req, res) => res.json({ users: allUsers() }));
+
+adminApi.patch("/users/:id", (req, res) => {
+  if (typeof req.body?.blocked !== "boolean") return res.status(400).json({ error: "Send { blocked: true } or { blocked: false }." });
+  const out = setBlocked(idParam(req), req.body.blocked);
+  if (out.error) return res.status(out.status).json({ error: out.error });
+  res.json(out);
 });
 
 // ---------- Messages ----------

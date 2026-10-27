@@ -29,7 +29,11 @@ async function api(path, { method = "GET", body } = {}) {
   }
   let data = null;
   try { data = await res.json(); } catch {}
-  if (!res.ok) throw Object.assign(new Error(data?.error || `The server couldn't do that (error ${res.status}).`), { status: res.status });
+  if (!res.ok) {
+    // "Sign in first": open the sign-in window (js/account.js) as well as showing the message
+    if (res.status === 401 && data?.signIn && typeof openSignIn === "function") openSignIn(data.error);
+    throw Object.assign(new Error(data?.error || `The server couldn't do that (error ${res.status}).`), { status: res.status, signIn: Boolean(data?.signIn) });
+  }
   return data;
 }
 

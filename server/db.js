@@ -12,6 +12,7 @@
 //   audience_reviews  visitors' star ratings and reviews
 //   comments          YouTube-style comments and replies, with comment_votes (likes and dislikes)
 //   messages          the website's feedback form
+//   users             viewers' accounts (Google or an emailed code), with user_sessions and sign_in_codes
 //   admin_sessions, sync_runs, meta
 import "./env.js";
 import { DatabaseSync } from "node:sqlite";
@@ -138,7 +139,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS movie_images_role ON movie_images (movie_id, r
 CREATE TABLE IF NOT EXISTS audience_reviews (
   id         INTEGER PRIMARY KEY,
   movie_id   INTEGER NOT NULL,               -- no foreign key: backups may hold reviews of deleted films
-  reviewer   TEXT    NOT NULL,               -- hash of the visitor's cookie: one rating per film per visitor
+  reviewer   TEXT    NOT NULL,               -- "u:<user id>" for an account, else a hash of the visitor's cookie: one per film
   name       TEXT    NOT NULL,
   stars      INTEGER NOT NULL CHECK (stars BETWEEN 1 AND 5),
   body       TEXT    NOT NULL DEFAULT '',
@@ -188,6 +189,40 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
   token_hash TEXT PRIMARY KEY,
   created_at TEXT NOT NULL,
   expires_at TEXT NOT NULL
+) WITHOUT ROWID;
+
+-- Viewers' accounts: signed in with Google or with a 6-digit code sent to their email, so each person has one
+-- rating per film. One email address is one account: a Google sign-in and an email code for the same address
+-- reach the same account.
+CREATE TABLE IF NOT EXISTS users (
+  id           INTEGER PRIMARY KEY,
+  name         TEXT    NOT NULL,
+  email        TEXT,                           -- as typed or given by Google; shown only to the viewer and the admin
+  email_key    TEXT    UNIQUE,                 -- the address matched on: lower case, Gmail dots and +tags removed
+  google_sub   TEXT    UNIQUE,                 -- Google's id for the person
+  blocked      INTEGER NOT NULL DEFAULT 0,     -- blocked by the admin: can't rate or comment; their posts are hidden
+  notice       TEXT,                           -- the privacy notice version agreed to when the account was made
+  created_at   TEXT    NOT NULL,
+  last_seen_at TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+  token_hash   TEXT PRIMARY KEY,
+  user_id      INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  created_at   TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  expires_at   TEXT NOT NULL
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS user_sessions_user ON user_sessions (user_id);
+
+-- The sign-in code last emailed to each address (both hashed), with its tries and how often codes were sent
+CREATE TABLE IF NOT EXISTS sign_in_codes (
+  email_hash   TEXT PRIMARY KEY,
+  code_hash    TEXT,
+  expires_at   TEXT,
+  attempts     INTEGER NOT NULL DEFAULT 0,
+  last_sent_at TEXT,
+  sent_times   TEXT NOT NULL DEFAULT '[]'      -- when codes were sent in the last 24 hours (JSON)
 ) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS sync_runs (
@@ -504,6 +539,7 @@ export function replaceCredits(movieId, source, people) {
 // The shape js/boxoffice.js uses. Visitors see `mine` on their own review; the admin sees `by` (a hash)
 export function reviewOut(r, { admin = false, reviewer = null } = {}) {
   const out = { id: r.id, movieId: r.movie_id, name: r.name, stars: r.stars, text: r.body, at: r.created_at };
+  if (String(r.reviewer).startsWith("u:")) out.verified = true;   // posted from a signed-in account
   if (r.hidden || admin) out.hidden = Boolean(r.hidden);
   if (admin) out.by = r.reviewer;
   else if (reviewer && r.reviewer === reviewer) out.mine = true;
