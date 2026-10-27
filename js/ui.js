@@ -28,8 +28,7 @@ const THEMES = [
 // before the page paints; only a theme the visitor actually picks is saved.
 const DEFAULT_THEME = "district";
 function currentTheme() {
-  const t = document.documentElement.dataset.theme;
-  return THEMES.some(x => x.id === t) ? t : DEFAULT_THEME;
+  return DEFAULT_THEME;
 }
 
 function setTheme(id, animate = true, save = true) {
@@ -45,91 +44,17 @@ function setTheme(id, animate = true, save = true) {
   document.querySelectorAll(".theme-tile").forEach(o => o.setAttribute("aria-checked", o.dataset.themeId === id));
 }
 
-// Build the theme picker in the navbar
-(function buildThemePicker() {
-  const nav = document.querySelector(".nav-inner");
-  if (!nav) return;
-  let seen = false;
-  try { seen = localStorage.getItem("manaThemeSeen") === "1"; } catch {}
-
-  const wrap = document.createElement("div");
-  wrap.className = "theme-wrap";
-  wrap.innerHTML = `
-    <button class="icon-btn${seen ? "" : " pulse"}" id="themeBtn" aria-label="Change theme" aria-controls="themeMenu" aria-expanded="false" title="Change theme">
-      <i data-lucide="palette"></i>
-    </button>
-    <div class="theme-menu" id="themeMenu">
-      <div class="theme-menu-head">
-        <p>Pick your vibe</p>
-        <button class="btn btn-ghost btn-sm" id="themeShuffle"><i data-lucide="shuffle"></i> Surprise me</button>
-      </div>
-      <div class="theme-grid" role="radiogroup" aria-label="Themes">
-        ${THEMES.map(t => `
-          <button class="theme-tile" role="radio" data-theme-id="${t.id}" aria-checked="${t.id === currentTheme()}"
-                  style="--t-bg:${t.bg};--t-surface:${t.surface};--t-accent:${t.accent};--t-gold:${t.gold}">
-            <span class="tile-preview" aria-hidden="true"><i class="tile-bar"></i><i class="tile-card"></i><i class="tile-dot"></i></span>
-            <span class="tile-name">${t.name}</span>
-            <small>${t.tag}</small>
-            <i data-lucide="check" class="tick"></i>
-          </button>`).join("")}
-      </div>
-    </div>`;
-  nav.appendChild(wrap);
-
-  const btn = wrap.querySelector("#themeBtn");
-  const menu = wrap.querySelector("#themeMenu");
-  const close = () => { menu.classList.remove("open"); btn.setAttribute("aria-expanded", false); };
-  const pick = id => {
-    setTheme(id);
-    toast(`Theme: ${THEMES.find(t => t.id === id).name}`);
-  };
-
-  btn.addEventListener("click", e => {
-    e.stopPropagation();
-    const open = menu.classList.toggle("open");
-    btn.setAttribute("aria-expanded", open);
-    if (open && navLinks?.classList.contains("open")) setMenu(false);   // never stack over the mobile menu
-    btn.classList.remove("pulse");
-    try { localStorage.setItem("manaThemeSeen", "1"); } catch {}
-  });
-  menu.addEventListener("click", e => {
-    const tile = e.target.closest(".theme-tile");
-    if (tile) { pick(tile.dataset.themeId); return; }
-    if (e.target.closest("#themeShuffle")) {
-      const others = THEMES.filter(t => t.id !== currentTheme());
-      pick(others[Math.floor(Math.random() * others.length)].id);
-    }
-  });
-  // Arrow keys move between the theme tiles (Space or Enter picks one)
-  const steps = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
-  menu.addEventListener("keydown", e => {
-    const tiles = [...menu.querySelectorAll(".theme-tile")];
-    const i = tiles.indexOf(document.activeElement);
-    if (i < 0 || !steps[e.key]) return;
-    e.preventDefault();
-    tiles[(i + steps[e.key] + tiles.length) % tiles.length].focus();
-  });
-  // Close on an outside click, on Escape (focus goes back to the palette button) or when focus leaves
-  document.addEventListener("click", e => { if (!wrap.contains(e.target)) close(); });
-  document.addEventListener("keydown", e => {
-    if (e.key !== "Escape" || !menu.classList.contains("open")) return;
-    const inside = wrap.contains(document.activeElement);
-    close();
-    if (inside) btn.focus();
-  });
-  // relatedTarget is null when a tile is clicked in Safari (buttons don't take focus), so that never closes it
-  wrap.addEventListener("focusout", e => { if (e.relatedTarget && !wrap.contains(e.relatedTarget)) close(); });
-})();
-setTheme(currentTheme(), false, false);
+// One look for everyone: District Black. (The theme picker was removed on 2026-10-27; older visits may
+// have saved another theme in "manaLook", which is now ignored.)
+setTheme(DEFAULT_THEME, false, false);
 
 // ---------- Search ----------
-// A magnifier button beside the theme button opens a search box over the page. It finds films by title,
+// A magnifier button at the end of the navbar opens a search box over the page. It finds films by title,
 // director, starring names, genre, language and year right in the browser, and, on the server, by anyone
 // in a film's cast and crew (api/search). "/" or Ctrl+K opens it from anywhere. Public pages only.
 (function buildSearch() {
   const nav = document.querySelector(".nav-inner");
-  const themeWrap = nav && nav.querySelector(".theme-wrap");
-  if (!nav || !themeWrap || nav.classList.contains("admin-top")) return;
+  if (!nav || nav.classList.contains("admin-top")) return;
 
   const btn = document.createElement("button");
   btn.type = "button";
@@ -139,7 +64,7 @@ setTheme(currentTheme(), false, false);
   btn.setAttribute("aria-haspopup", "dialog");
   btn.title = "Search ( / )";
   btn.innerHTML = `<i data-lucide="search"></i>`;
-  nav.insertBefore(btn, themeWrap);
+  nav.appendChild(btn);   // the last item in the navbar, after the links
 
   const dialog = document.createElement("dialog");
   dialog.className = "search-dialog";

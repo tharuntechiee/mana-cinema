@@ -175,7 +175,7 @@ function starHTML(s, i) {
     </a>`;
 }
 
-// The centre: his photo only (no text), in a red ring; without a photo, the site's own They Call Him OG
+// The centre: his photo in a red ring, with his name and language under it like the others; without a photo, the site's own They Call Him OG
 // drawing (js/art.js). Like every hero around it, it opens his language's lists (Telugu).
 function leadHTML(s) {
   const href = listsLink(s);
@@ -186,6 +186,8 @@ function leadHTML(s) {
   return `
     <a class="star star-lead star-og" href="${href}" aria-label="${esc(label)}" style="--i:0">
       ${picture}
+      <span class="star-name">${esc(s.name)}</span>
+      <span class="star-lang">${esc(s.lang)}</span>
     </a>`;
 }
 
