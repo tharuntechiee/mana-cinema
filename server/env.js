@@ -24,7 +24,7 @@ export const config = {
   authSecret: (process.env.AUTH_SECRET || "").trim(),
   googleClientId: (process.env.GOOGLE_CLIENT_ID || "").trim(),
   googleJwksUrl: process.env.GOOGLE_JWKS_URL || "https://www.googleapis.com/oauth2/v3/certs",
-  // Email codes: "smtp" (your own mail account, e.g. Gmail with an app password) or "console" (testing)
+  // Email codes: "brevo" (Brevo's API), "smtp" (your own mail account, e.g. Gmail) or "console" (testing)
   emailSender: (process.env.EMAIL_SENDER || "").trim().toLowerCase(),
   smtp: {
     host: (process.env.SMTP_HOST || "smtp.gmail.com").trim(),
@@ -33,5 +33,7 @@ export const config = {
     pass: (process.env.SMTP_PASS || "").replace(/\s/g, ""),   // Gmail shows app passwords in groups of 4
   },
   mailFrom: (process.env.MAIL_FROM || "").trim(),
+  brevoKey: (process.env.BREVO_API_KEY || "").trim(),
+  brevoUrl: process.env.BREVO_API_URL || "https://api.brevo.com/v3/smtp/email",
   codesDailyLimit: Math.max(0, Number(process.env.CODES_DAILY_LIMIT ?? 400) || 0),
 };

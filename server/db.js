@@ -18,10 +18,9 @@ import "./env.js";
 import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
+import { ROOT, DATA_DIR, DB_FILE } from "./paths.js";
 
-export const ROOT = path.resolve(import.meta.dirname, "..");
-export const DATA_DIR = path.join(ROOT, "data");
-export const DB_FILE = process.env.DATABASE_FILE ? path.resolve(ROOT, process.env.DATABASE_FILE) : path.join(DATA_DIR, "mana-cinema.db");
+export { ROOT, DATA_DIR, DB_FILE };
 fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
 
 export const db = new DatabaseSync(DB_FILE);

@@ -12,13 +12,25 @@ process.env.IMAGE_CACHE_DIR = path.join(dir, "img");
 // Sign-in starts switched off whatever .env says; the accounts checks switch it on
 process.env.EMAIL_SENDER = "";
 process.env.GOOGLE_CLIENT_ID = "";
+process.env.TURSO_DATABASE_URL = "";
 
 // A stand-in for TMDB's image server: a tiny WebP, a slow answer, an HTML page and a too-large file
 const http = await import("node:http");
 const upstreamHits = {};
 let jwks = { keys: [] };   // a stand-in for Google's sign-in keys, at /certs
+const brevoMail = [];      // and for Brevo's email API, at /brevo
 const TINY_WEBP = Buffer.from("UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA=", "base64");
 const upstream = http.createServer((req, res) => {
+  if (req.url === "/brevo" && req.method === "POST") {
+    let body = "";
+    req.on("data", c => { body += c; });
+    req.on("end", () => {
+      brevoMail.push({ key: req.headers["api-key"], body: JSON.parse(body) });
+      res.writeHead(201, { "Content-Type": "application/json" });
+      res.end('{"messageId":"<check@brevo>"}');
+    });
+    return;
+  }
   if (req.url === "/certs") { res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "public, max-age=600" }); return res.end(JSON.stringify(jwks)); }
   const name = req.url.split("/").pop();
   upstreamHits[name] = (upstreamHits[name] || 0) + 1;
@@ -352,8 +364,36 @@ try {
   check((await call("POST", "/api/auth/email/start", { email: "nobody@example.com" }, { jar: {} })).status === 502, "a mail problem is reported, not hidden");
   smtpServer.close();
 
+  // Brevo's email API (for hosts that block mail ports)
+  Object.assign(config, { emailSender: "brevo", brevoKey: "check-brevo-key", mailFrom: "codes@example.com", brevoUrl: `http://localhost:${upstream.address().port}/brevo` });
+  const viaBrevo = await call("POST", "/api/auth/email/start", { email: "brevo.fan@example.com" }, { jar: {} });
+  const sentBrevo = brevoMail.at(-1);
+  const brevoCode = /(\d{6}) is your MANA CINEMA/.exec(sentBrevo?.body.subject || "")?.[1];
+  check(viaBrevo.status === 200 && sentBrevo?.key === "check-brevo-key" && sentBrevo.body.to[0].email === "brevo.fan@example.com" && sentBrevo.body.sender.email === "codes@example.com" && Boolean(brevoCode), "with Brevo set up, the code is emailed through its API");
+  check((await call("POST", "/api/auth/email/verify", { email: "brevo.fan@example.com", code: brevoCode }, { jar: {} })).status === 200, "the code from Brevo signs in");
+
   console.log = log;
   Object.assign(config, { emailSender: "", googleClientId: "" });
+  // Database copies in Turso (for hosts that wipe their disk): a local libSQL file stands in for Turso
+  const snap = await import("./snapshot.js");
+  const { DB_FILE } = await import("./paths.js");
+  check(snap.snapshotsOn() === false && (await snap.restoreSnapshot(path.join(dir, "none.db"))) === "off", "without Turso settings, database copies are off");
+  process.env.TURSO_DATABASE_URL = ":memory:";
+  const snapLog = [];
+  const saver = snap.startAutoSave(db, DB_FILE, m => snapLog.push(m));
+  await new Promise(r => setTimeout(r, 300));
+  db.prepare("INSERT INTO messages (name, body, created_at) VALUES (?, ?, ?)").run("Snapshot", "kept through a restart", new Date().toISOString());
+  await saver.saveNow();
+  check(snapLog.some(m => /Database copy saved/.test(m)), "a change is copied to Turso");
+  const restoredFile = path.join(dir, "restored", "site.db");
+  check((await snap.restoreSnapshot(restoredFile, () => {})) === "restored", "the copy comes back on a wiped disk");
+  const { DatabaseSync } = await import("node:sqlite");
+  const back = new DatabaseSync(restoredFile, { readOnly: true });
+  check(back.prepare("SELECT COUNT(*) AS n FROM messages WHERE body = 'kept through a restart'").get().n === 1 && back.prepare("SELECT COUNT(*) AS n FROM movies").get().n === films.length, "the restored database has the latest change and every film");
+  back.close();
+  await snap.closeSnapshots();
+  delete process.env.TURSO_DATABASE_URL;
+
   check((await call("POST", "/api/admin/logout", undefined, { auth: true })).status === 200, "admin signs out");
   check((await call("GET", "/api/admin/data", undefined, { auth: true })).status === 401, "signed-out cookie no longer works");
 } catch (err) {

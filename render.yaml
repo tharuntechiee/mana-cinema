@@ -1,0 +1,40 @@
+# Render Blueprint: one free web service in Singapore (the nearest Render region to India).
+# Render: New > Blueprint > pick this repository. It asks for every "sync: false" value once.
+# See docs/deploy-render.md.
+services:
+  - type: web
+    name: mana-cinema
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    buildCommand: npm ci --omit=dev
+    startCommand: node server/index.js
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      # Render's proxy handles HTTPS; this lets the app see it (secure cookies, visitor IPs)
+      - key: TRUST_PROXY
+        value: "1"
+      # The free disk is wiped on every restart: the database is kept in Turso (server/snapshot.js)
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: TMDB_API_KEY
+        sync: false
+      # Sign-in: Google, and codes by email through Brevo (Render free blocks the usual mail ports)
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: EMAIL_SENDER
+        value: brevo
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false

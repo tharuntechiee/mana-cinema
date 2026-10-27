@@ -36,7 +36,7 @@ const cookieOptions = req => ({ httpOnly: true, sameSite: "lax", secure: req.sec
 // ---------- Which sign-in methods this server offers ----------
 // Email codes go out through your own mail account (EMAIL_SENDER=smtp) or, for testing on this computer,
 // EMAIL_SENDER=console, which prints the code in the server window
-export const emailMethod = () => (["smtp", "console"].includes(config.emailSender) ? { test: config.emailSender === "console" } : null);
+export const emailMethod = () => (["brevo", "smtp", "console"].includes(config.emailSender) ? { test: config.emailSender === "console" } : null);
 export function signInMethods() {
   return { google: config.googleClientId || null, email: emailMethod() };
 }

@@ -5,7 +5,7 @@
   "description": "MANA CINEMA: Indian box office and ratings hub. Express API and SQLite database.",
   "license": "UNLICENSED",
   "engines": {
-    "node": ">=22.13"
+    "node": ">=22.13 <25"
   },
   "scripts": {
     "start": "node server/index.js",
@@ -13,9 +13,12 @@
     "sync": "node server/sync/cli.js",
     "sync:ratings": "node server/sync/cli.js ratings",
     "check": "node server/check.js",
-    "backup": "node server/backup.js"
+    "backup": "node server/backup.js",
+    "turso:push": "node server/snapshot-cli.js push",
+    "turso:list": "node server/snapshot-cli.js list"
   },
   "dependencies": {
+    "@libsql/client": "^0.18.0",
     "compression": "^1.8.2",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",

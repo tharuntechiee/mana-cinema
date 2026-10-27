@@ -37,9 +37,13 @@ newest 14 in `data/backups/`.
 
 1. Make an SSH key on your PC if you don't have one (PowerShell):
    ```powershell
+   New-Item -ItemType Directory -Force $HOME\.ssh
    ssh-keygen -t ed25519 -f $HOME\.ssh\oracle_mana
+   Get-Content $HOME\.ssh\oracle_mana.pub
    ```
-   Press Enter for no passphrase, or set one. The public key is `$HOME\.ssh\oracle_mana.pub`.
+   The first line makes the `.ssh` folder (ssh-keygen fails without it). Press Enter for no passphrase, or
+   set one. The last line shows the public key to paste into Oracle: the whole line starting `ssh-ed25519`.
+   Never share `oracle_mana` itself (no `.pub`): that's the private key.
 2. In the Oracle console: **Compute > Instances > Create instance**.
    - **Image:** Canonical Ubuntu 24.04 (the aarch64 / ARM build).
    - **Shape:** Ampere, **VM.Standard.A1.Flex**, 2 OCPUs and 12 GB (or 1 and 6 to leave room for a second server).

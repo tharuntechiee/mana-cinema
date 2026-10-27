@@ -1,12 +1,23 @@
 // MANA CINEMA server. npm start, then open http://localhost:8080
-import "./env.js";
 import { config } from "./env.js";
-import { db, DB_FILE } from "./db.js";
-import { ensureSeeded } from "./seed.js";
-import { createApp } from "./app.js";
-import { scheduleDailyRatings } from "./sync/jobs.js";
+import { DB_FILE } from "./paths.js";
+import { restoreSnapshot, startAutoSave } from "./snapshot.js";
+
+// On a host with a wiped disk (Render free), put the saved database copy in place before anything opens it
+try {
+  await restoreSnapshot(DB_FILE);
+} catch (err) {
+  console.error(`Couldn't restore the database copy from Turso: ${err.message}`);
+  process.exit(1);   // starting empty would overwrite the saved copy with an empty one
+}
+
+const { db } = await import("./db.js");
+const { ensureSeeded } = await import("./seed.js");
+const { createApp } = await import("./app.js");
+const { scheduleDailyRatings } = await import("./sync/jobs.js");
 
 ensureSeeded();
+const autoSave = startAutoSave(db, DB_FILE);
 const server = createApp().listen(config.port, config.host, () => {
   console.log(`MANA CINEMA is running at http://${config.host || "localhost"}:${config.port}`);
   console.log(`Database: ${DB_FILE}`);
@@ -19,11 +30,18 @@ server.on("error", err => {
 });
 scheduleDailyRatings();
 
-// On stop or restart (Ctrl+C, systemctl restart): finish the requests in flight, then close the database cleanly
+// On stop or restart (Ctrl+C, systemctl restart, Render's SIGTERM): finish the requests in flight, save the
+// last database copy, then close the database cleanly. Render allows 30 seconds.
+let stopping = false;
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => {
-    server.close(() => { db.close(); process.exit(0); });
+    if (stopping) return;
+    stopping = true;
+    setTimeout(() => process.exit(0), 25e3).unref();   // a stuck connection or upload can't hold up a restart
+    const closed = new Promise(resolve => server.close(resolve));
     server.closeIdleConnections();
-    setTimeout(() => process.exit(0), 10e3).unref();   // a stuck connection can't hold up a restart
+    Promise.race([closed, new Promise(r => setTimeout(r, 5e3))])   // requests in flight get 5 seconds
+      .then(() => autoSave.saveNow())
+      .finally(() => { db.close(); process.exit(0); });
   });
 }
