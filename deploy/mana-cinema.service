@@ -1,0 +1,37 @@
+# MANA CINEMA as a system service: starts at boot, restarts if it stops.
+# Install: sudo cp deploy/mana-cinema.service /etc/systemd/system/ && sudo systemctl daemon-reload
+#          sudo systemctl enable --now mana-cinema
+# Logs:    journalctl -u mana-cinema -f
+[Unit]
+Description=MANA CINEMA website
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=mana
+Group=mana
+WorkingDirectory=/home/mana/app
+# Settings and secrets come from .env (server/env.js reads it); these win over it
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=TRUST_PROXY=1
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=5
+# Stop gives the app time to finish requests and close the database
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+# Hardening: the app can write only its own data folder
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/mana/app/data
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

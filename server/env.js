@@ -12,6 +12,8 @@ if (fs.existsSync(file)) process.loadEnvFile(file);
 
 export const config = {
   port: Number(process.env.PORT) || 8080,
+  // Behind Caddy on a server, HOST=127.0.0.1 so only Caddy (HTTPS) can reach the app; empty = every interface
+  host: (process.env.HOST || "").trim() || undefined,
   adminPassword: process.env.ADMIN_PASSWORD || "",
   tmdbKey: (process.env.TMDB_API_KEY || "").trim(),
   youtubeKey: (process.env.YOUTUBE_API_KEY || "").trim(),

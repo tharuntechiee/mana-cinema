@@ -12,7 +12,8 @@
     "dev": "node --watch server/index.js",
     "sync": "node server/sync/cli.js",
     "sync:ratings": "node server/sync/cli.js ratings",
-    "check": "node server/check.js"
+    "check": "node server/check.js",
+    "backup": "node server/backup.js"
   },
   "dependencies": {
     "compression": "^1.8.2",

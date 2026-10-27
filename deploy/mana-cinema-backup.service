@@ -1,0 +1,15 @@
+# One database backup (npm run backup). Started every night by mana-cinema-backup.timer.
+# Run one now: sudo systemctl start mana-cinema-backup    Logs: journalctl -u mana-cinema-backup
+[Unit]
+Description=MANA CINEMA database backup
+
+[Service]
+Type=oneshot
+User=mana
+Group=mana
+WorkingDirectory=/home/mana/app
+ExecStart=/usr/bin/node server/backup.js
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/mana/app/data

@@ -1,0 +1,14 @@
+# Backs up the database every night at 02:30 India time, and after boot if a backup was missed.
+# Install: sudo cp deploy/mana-cinema-backup.* /etc/systemd/system/ && sudo systemctl daemon-reload
+#          sudo systemctl enable --now mana-cinema-backup.timer
+# Check:   systemctl list-timers mana-cinema-backup
+[Unit]
+Description=Nightly MANA CINEMA database backup
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 Asia/Kolkata
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target
