@@ -102,7 +102,7 @@ function listLimit(lang, key) {
 // Films without artwork or a photo (most list films) get their title on the gradient, so the poster isn't blank
 // (cards already print the year and genre under the poster, so they pass { sub: false })
 function filmPoster(m, { sub: withSub = true } = {}) {
-  if (posterImage(m) || Object.hasOwn(HEROES, m.art || "")) return posterHTML(m, { compact: true });
+  if (posterImage(m) || Object.hasOwn(HEROES, artFor(m))) return posterHTML(m, { compact: true, size: withSub ? "w500" : "w342" });
   const sub = withSub ? [m.lang, m.year].filter(Boolean).join(" · ") : "";
   return `
     <div class="poster poster-text" style="${posterStyle(m)}" aria-hidden="true">
@@ -170,7 +170,7 @@ function genrePills(m) {
 function renderHeader(jumps, { hasNumbers = false } = {}) {
   const m = film;
   const released = isReleased(m);
-  $("filmBackdrop").setAttribute("style", posterStyle(m));
+  $("filmBackdrop").setAttribute("style", posterStyle(m, "w342"));   // blurred, so a small size is enough
 
   // Released: the collections are the main action. Upcoming: there is nothing to track yet,
   // so "Remind me" leads and the collections link (which says when tracking starts) follows.
@@ -239,10 +239,14 @@ const DEPARTMENT_LABELS = { Sound: "Music & sound", "Costume & Make-Up": "Costum
 // Within a department, the head of it first: Director, Screenplay, Music, Director of Photography, Editor, Producer
 const LEAD_JOB = /^(director|screenplay|writer|story|music|original music composer|director of photography|cinematography|editor|producer)$/i;
 
+// A photo (served by our /img route) sits over the initials; if it fails to load it removes itself
+const PHOTO = /^img\/w185\/[A-Za-z0-9]{8,64}\.(jpg|png)$/;
+const photoHTML = (p, size = 88) => (PHOTO.test(p.photo || "")
+  ? `<img class="cast-photo" src="${p.photo}" alt="" loading="lazy" decoding="async" width="${size}" height="${size}" onerror="this.remove()">` : "");
 function personHTML(p) {
   return `
     <li class="cast-person">
-      <span class="cast-avatar" aria-hidden="true">${esc(initials(p.name))}</span>
+      <span class="cast-avatar" aria-hidden="true">${esc(initials(p.name))}${photoHTML(p)}</span>
       <span class="cast-name">${esc(p.name)}</span>
       ${p.role ? `<span class="cast-role">${esc(p.role)}</span>` : ""}
     </li>`;
@@ -263,7 +267,7 @@ async function loadCredits(sec) {
     return;
   }
   const directors = crew.filter(c => /^director$/i.test(c.job));
-  const top = [...directors.map(d => ({ name: d.name, role: "Director" })), ...cast.slice(0, TOP_BILLED).map(c => ({ name: c.name, role: c.character }))];
+  const top = [...directors.map(d => ({ name: d.name, role: "Director", photo: d.photo })), ...cast.slice(0, TOP_BILLED).map(c => ({ name: c.name, role: c.character, photo: c.photo }))];
   const known = new Set(DEPARTMENTS);
   const groups = DEPARTMENTS
     .map(dep => [dep, crew.filter(c => (known.has(c.department) ? c.department : "Crew") === dep)

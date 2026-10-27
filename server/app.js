@@ -8,6 +8,7 @@ import { ROOT } from "./db.js";
 import { config } from "./env.js";
 import { publicApi } from "./routes/public.js";
 import { adminApi } from "./routes/admin.js";
+import { imageRoute } from "./images.js";
 
 export function createApp() {
   const app = express();
@@ -50,6 +51,9 @@ export function createApp() {
     res.status(500).json({ error: "Something went wrong on the server. Try again." });
   });
   app.use("/api", api);
+
+  // ---------- Images (posters and people photos from TMDB, cached on disk) ----------
+  app.get("/img/:size/:file", imageRoute);
 
   // ---------- Website ----------
   const PAGES = ["index.html", "film.html", "lists.html", "admin.html"];

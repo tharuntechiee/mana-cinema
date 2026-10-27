@@ -1,4 +1,5 @@
 // Original hero artwork for each film: a backlit silhouette with the hero's signature prop.
+// Every film gets one (see artFor below), so no list row or card is left as a blank tile.
 // Drawn as SVG so it scales to any poster size and needs no image files.
 // A real photo in images/posters/ (see images/README.txt) replaces it automatically.
 
@@ -117,10 +118,31 @@ const HEROES = {
   },
 };
 
+// Which drawing a film gets: its own (chosen in the admin portal), else one of the shared figures picked
+// from its genre, the way the catalogue's own films were matched. The four film-specific drawings
+// (og, kalki, pushpa, devara) are never handed out. Films with no genre get the neutral "mirage" figure.
+const GENRE_ART = [
+  [/sport|athlet|boxing|cricket|wrestl/, "athlete"],
+  [/romanc|romantic|musical|love/, "couple"],
+  [/family|coming.of.age|children|kids/, "family"],
+  [/mytholog|devotional|historical|period|epic|war|folklore|legend/, "trident"],
+  [/science.fiction|sci.fi|space/, "astronaut"],
+  [/fantasy|superhero|horror|supernatural/, "staff"],
+  [/cop|police|procedural/, "signal"],
+  [/gangster|action/, "king"],
+  [/spy|political|crime|thriller|courtroom|caper|mystery|suspense/, "mirage"],
+  [/comedy|satir/, "family"],
+];
+function artFor(m) {
+  if (Object.hasOwn(HEROES, m.art || "")) return m.art;
+  const genre = String(m.genre || "").toLowerCase();
+  return (GENRE_ART.find(([re]) => re.test(genre)) || [, "mirage"])[1];
+}
+
 // align: where the figure sits when the box crops it ("xMidYMax" keeps the feet on posters; "xMidYMid"
 // centres the bust in a circle)
 function heroArt(m, cls = "poster-art", align = "xMidYMax") {
-  const hero = HEROES[m.art];
+  const hero = HEROES[artFor(m)];
   if (!hero) return "";
   const id = ++artId;
   return `

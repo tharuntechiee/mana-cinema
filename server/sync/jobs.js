@@ -2,7 +2,7 @@
 import { db, nowISO } from "../db.js";
 import { config } from "../env.js";
 import { matchIds, syncRatings, syncCredits } from "./imdb.js";
-import { syncTmdb } from "./tmdb.js";
+import { syncTmdb, syncImages } from "./tmdb.js";
 import { syncTrailers } from "./youtube.js";
 
 export const TASKS = {
@@ -15,6 +15,11 @@ export const TASKS = {
     label: "Full cast and crew from TMDB", source: "TMDB", key: "TMDB_API_KEY",
     about: "Every actor with their role and the whole crew, plus IMDb IDs the match missed. Needs a free TMDB key.",
     run: syncTmdb,
+  },
+  images: {
+    label: "Posters and images from TMDB", source: "TMDB", key: "TMDB_API_KEY",
+    about: "Every poster, backdrop and logo for each film, and the best poster picked for the site. Image files are fetched only when first shown.",
+    run: syncImages,
   },
   ratings: {
     label: "IMDb ratings", source: "IMDb",
@@ -33,7 +38,8 @@ export const TASKS = {
   },
 };
 export const TASK_IDS = Object.keys(TASKS);   // also the order "all" runs them in
-const keySet = id => (id === "tmdb" ? Boolean(config.tmdbKey) : id === "youtube" ? Boolean(config.youtubeKey) : true);
+const KEYS = { TMDB_API_KEY: () => config.tmdbKey, YOUTUBE_API_KEY: () => config.youtubeKey };
+const keySet = id => !TASKS[id].key || Boolean(KEYS[TASKS[id].key]?.());
 
 // Runs tasks in order. log(line) gets progress; returns [{ task, ok, summary }]
 export async function runTasks(tasks, { movieIds = null, refresh = false, log = () => {} } = {}) {

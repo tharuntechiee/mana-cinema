@@ -218,7 +218,7 @@ setTheme(currentTheme(), false, false);
   }
   const hitHTML = ({ m, why: reason }) => `
     <li><a class="search-hit" href="film.html?id=${Number(m.id)}">
-      <span class="search-poster">${posterHTML(m, { compact: true })}</span>
+      <span class="search-poster">${posterHTML(m, { compact: true, size: "w185" })}</span>
       <span class="search-info">
         <strong>${esc(m.title)}</strong>
         <small>${esc(metaLine(m))}</small>
@@ -414,10 +414,11 @@ function markPhotos(root = document) {
 }
 
 // ---------- Shared helpers ----------
-function posterHTML(m, { compact = false } = {}) {
-  if (compact) return `<div class="poster" ${imgAttr(m)} style="${posterStyle(m)}" aria-hidden="true">${heroArt(m)}</div>`;
+// size: which TMDB poster size to use ("w185" for small thumbs, "w342" for cards, "w500" for big cards)
+function posterHTML(m, { compact = false, size } = {}) {
+  if (compact) return `<div class="poster" ${imgAttr(m, size)} style="${posterStyle(m, size)}" aria-hidden="true">${heroArt(m)}</div>`;
   return `
-    <div class="poster" ${imgAttr(m)} style="${posterStyle(m)}">
+    <div class="poster" ${imgAttr(m, size)} style="${posterStyle(m, size)}">
       ${heroArt(m)}
       <div class="poster-title">${esc(m.title)}</div>
       <div class="poster-lang">${esc(m.lang)}</div>

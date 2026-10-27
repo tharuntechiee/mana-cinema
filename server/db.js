@@ -8,6 +8,7 @@
 //   imdb_ratings      IMDb rating and votes (from IMDb's datasets, the admin, or the original catalogue)
 //   people, credits   cast and crew (IMDb's principal cast and crew, or TMDB's full credits)
 //   trailers          the film's YouTube trailer with its views and likes
+//   movie_images      every TMDB poster, backdrop and logo of a film; the chosen poster is served by /img
 //   audience_reviews  visitors' star ratings and reviews
 //   comments          YouTube-style comments and replies, with comment_votes (likes and dislikes)
 //   messages          the website's feedback form
@@ -105,6 +106,34 @@ CREATE TABLE IF NOT EXISTS trailers (
   as_of        TEXT,
   source       TEXT    NOT NULL              -- 'youtube' (found by search) or 'admin'
 );
+
+-- Every TMDB image of a film (posters, backdrops, logos). The sync stores them all as 'pending' and picks
+-- one poster per film as 'approved' with role 'poster'; only approved images can be served by /img.
+CREATE TABLE IF NOT EXISTS movie_images (
+  id           INTEGER PRIMARY KEY,
+  movie_id     INTEGER NOT NULL REFERENCES movies (id) ON DELETE CASCADE,
+  tmdb_id      INTEGER NOT NULL,             -- the TMDB film it came from
+  kind         TEXT    NOT NULL CHECK (kind IN ('poster', 'backdrop', 'logo')),
+  file_path    TEXT    NOT NULL,             -- "abc123.jpg" (no leading slash)
+  width        INTEGER,
+  height       INTEGER,
+  aspect_ratio REAL,
+  lang         TEXT,                         -- text language on the image, NULL = no text
+  country      TEXT,
+  vote_average REAL,
+  vote_count   INTEGER,
+  rank         INTEGER NOT NULL,             -- TMDB's order within its kind
+  status       TEXT    NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'hidden')),
+  role         TEXT CHECK (role IN ('poster', 'hero')),
+  chosen_by    TEXT,                         -- 'auto' (the sync) or 'admin'; the sync never changes an admin's choice
+  first_seen   TEXT    NOT NULL,
+  last_seen    TEXT    NOT NULL,
+  gone_at      TEXT,
+  UNIQUE (movie_id, kind, file_path)
+);
+CREATE INDEX IF NOT EXISTS movie_images_film ON movie_images (movie_id, kind, status, rank);
+CREATE INDEX IF NOT EXISTS movie_images_file ON movie_images (file_path);
+CREATE UNIQUE INDEX IF NOT EXISTS movie_images_role ON movie_images (movie_id, role) WHERE role IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS audience_reviews (
   id         INTEGER PRIMARY KEY,
@@ -255,9 +284,10 @@ export function readFilms(ids = null) {
   const imdb = new Map(db.prepare(`SELECT * FROM imdb_ratings ${where}`).all(...args).map(r => [r.movie_id, r]));
   const trailers = new Map(db.prepare(`SELECT * FROM trailers ${where}`).all(...args).map(r => [r.movie_id, r]));
   const credits = groupBy(db.prepare(`SELECT movie_id, kind, COUNT(*) AS n, MAX(source) AS source FROM credits ${where} GROUP BY movie_id, kind`).all(...args));
+  const posters = new Map(db.prepare(`SELECT movie_id, file_path FROM movie_images ${where ? where + " AND" : "WHERE"} role = 'poster' AND status = 'approved' AND gone_at IS NULL`).all(...args).map(r => [r.movie_id, r.file_path]));
   return movies.map(row => assemble(row, {
     days: days.get(row.id) || [], critics: critics.get(row.id) || [], imdb: imdb.get(row.id),
-    trailer: trailers.get(row.id), credits: credits.get(row.id) || [],
+    trailer: trailers.get(row.id), credits: credits.get(row.id) || [], poster: posters.get(row.id),
   }));
 }
 export function readFilm(id) {
@@ -295,6 +325,7 @@ function assemble(row, parts) {
       if (t[col] !== null) film.trailer[key] = t[col];
     }
   }
+  if (parts.poster) film.images = { poster: parts.poster };   // pages build img/<size>/<file> links from it
   if (parts.credits.length) {
     film.credits = { cast: 0, crew: 0 };
     for (const c of parts.credits) { film.credits[c.kind] = c.n; film.credits.source = c.source; }
@@ -304,7 +335,7 @@ function assemble(row, parts) {
 
 // ---------- Writing films ----------
 // Fields with their own columns or tables; everything else is kept in `details` as it came
-const OWN_FIELDS = ["id", "title", "lang", "year", "release", "imdbId", "imdbSource", "tmdbId", "critics", "boxOffice", "trailer", "credits"];
+const OWN_FIELDS = ["id", "title", "lang", "year", "release", "imdbId", "imdbSource", "tmdbId", "critics", "boxOffice", "trailer", "credits", "images"];
 
 // Saves one film (insert or replace). origin:
 //   "admin"   an edit in the admin portal: an unchanged IMDb rating or trailer keeps its source and stats
@@ -422,7 +453,7 @@ export function readCredits(movieId) {
     const out = { personId: r.person_id, name: r.name };
     if (r.imdb_id) out.imdbId = r.imdb_id;
     if (r.tmdb_id) out.tmdbId = r.tmdb_id;
-    if (r.photo) out.photo = `https://image.tmdb.org/t/p/w185${r.photo}`;
+    if (r.photo) out.photo = `img/w185${r.photo}`;   // served and cached by server/images.js
     return out;
   };
   // One line per person: a double role becomes "Prem / Vijay", story and screenplay "Story, Screenplay"

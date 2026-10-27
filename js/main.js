@@ -14,7 +14,7 @@ const releaseTime = m => parseDay(m.release)?.getTime() ?? 0;
 const byTitle = (a, b) => String(a.title).localeCompare(String(b.title));
 const outOf10 = v => `${v.toFixed(1)}<small>/10</small>`;
 // Drawn artwork (js/art.js). List films have none, so their posters print the title instead.
-const hasArt = m => Boolean(HEROES[m.art]);
+const hasArt = m => Boolean(HEROES[artFor(m)]);
 // "Hindi · 2016" (already escaped)
 const langYear = m => [m.lang && esc(m.lang), yearOf(m)].filter(Boolean).join(" · ");
 // The opening day figure counts paid previews: a Day 0 row, or previews a list film reported apart
@@ -176,13 +176,10 @@ function starHTML(s, i) {
 }
 
 // The centre: his photo only (no text), in a red ring; without a photo, the site's own They Call Him OG
-// drawing (js/art.js). It opens the OG film page (or his language's lists if that film has been removed);
-// the link's label says so.
-const OG_FILM_ID = 10;
+// drawing (js/art.js). Like every hero around it, it opens his language's lists (Telugu).
 function leadHTML(s) {
-  const og = getMovie(OG_FILM_ID);
-  const href = og ? `film.html?id=${OG_FILM_ID}` : listsLink(s);
-  const label = og ? `${s.name} in ${og.title}: box office` : `${s.name}: ${s.lang} box office lists`;
+  const href = listsLink(s);
+  const label = `${s.name}: ${s.lang} box office lists`;
   const picture = s.img
     ? `<span class="star-photo"><img src="${esc(s.img)}" width="400" height="400" alt="${esc(s.name)}" decoding="async" loading="eager" fetchpriority="high"></span>`
     : `<span class="star-photo star-art">${heroArt({ art: "og" }, "star-art-svg", "xMidYMid")}</span>`;
@@ -383,7 +380,7 @@ function showHero(i) {
   heroIndex = i;
   const m = featured[i];
   const heroPoster = $("heroPoster");
-  heroPoster.setAttribute("style", posterStyle(m));
+  heroPoster.setAttribute("style", posterStyle(m, "w500"));
   heroPoster.innerHTML = hasArt(m) ? heroArt(m) : posterNameHTML(m);
   // A real poster photo replaces the drawn artwork once it loads (as on the film cards)
   const photo = posterImage(m);

@@ -8,6 +8,25 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mana-check-"));
 process.env.DATABASE_FILE = path.join(dir, "check.db");
 process.env.ADMIN_PASSWORD = "check-password-123";
 process.env.AUTO_SYNC_RATINGS = "false";
+process.env.IMAGE_CACHE_DIR = path.join(dir, "img");
+
+// A stand-in for TMDB's image server: a tiny WebP, a slow answer, an HTML page and a too-large file
+const http = await import("node:http");
+const upstreamHits = {};
+const TINY_WEBP = Buffer.from("UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAwA0JaQAA3AA/vuUAAA=", "base64");
+const upstream = http.createServer((req, res) => {
+  const name = req.url.split("/").pop();
+  upstreamHits[name] = (upstreamHits[name] || 0) + 1;
+  if (name.startsWith("slowfile")) return setTimeout(() => { res.writeHead(200, { "Content-Type": "image/webp" }); res.end(TINY_WEBP); }, 300);
+  if (name.startsWith("htmlfile")) { res.writeHead(200, { "Content-Type": "text/html" }); return res.end("<h1>not an image</h1>"); }
+  if (name.startsWith("hugefile")) { res.writeHead(200, { "Content-Type": "image/webp" }); return res.end(Buffer.alloc(3 * 1024 * 1024)); }
+  if (name.startsWith("gonefile")) { res.writeHead(404, { "Content-Type": "text/html" }); return res.end("gone"); }
+  res.writeHead(200, { "Content-Type": "image/webp" });
+  res.end(TINY_WEBP);
+});
+upstream.listen(0);
+await new Promise(r => upstream.once("listening", r));
+process.env.IMAGE_UPSTREAM = `http://localhost:${upstream.address().port}/t/p`;
 
 const { ensureSeeded } = await import("./seed.js");
 const { createApp } = await import("./app.js");
@@ -81,6 +100,29 @@ try {
   check((await call("GET", "/api/search?q=SUJEETH")).json.movies[0]?.why === "Director: Sujeeth", "search finds a film by its director, in any case");
   check((await call("GET", "/api/search?q=k")).json.movies.length === 0 && (await call("GET", "/api/search?q=%25_%25")).json.movies.length === 0, "one letter or wildcards find nothing");
   replaceCredits(10, "tmdb", []);
+
+  // Posters and photos through /img (the stand-in above plays TMDB)
+  const addImage = (file, status = "approved", role = null) => db.prepare(`INSERT INTO movie_images (movie_id, tmdb_id, kind, file_path, rank, status, role, chosen_by, first_seen, last_seen)
+    VALUES (10, 1, 'poster', ?, 0, ?, ?, 'auto', 'now', 'now')`).run(file, status, role);
+  addImage("posterfile1.jpg", "approved", "poster");
+  addImage("slowfile123.jpg");
+  addImage("htmlfile123.jpg");
+  addImage("hugefile123.jpg");
+  addImage("pendingfile1.jpg", "pending");
+  const ogNow = (await call("GET", "/api/movies/10")).json.movie;
+  check(ogNow.images?.poster === "posterfile1.jpg", "a film carries its chosen poster");
+  const firstImg = await fetch(`${base}/img/w342/posterfile1.jpg`);
+  const secondImg = await fetch(`${base}/img/w342/posterfile1.jpg`);
+  check(firstImg.status === 200 && firstImg.headers.get("content-type") === "image/webp" && secondImg.status === 200 && upstreamHits["posterfile1.jpg"] === 1, "a poster is fetched once, then served from disk as WebP");
+  await Promise.all(Array.from({ length: 10 }, () => fetch(`${base}/img/w185/slowfile123.jpg`)));
+  check(upstreamHits["slowfile123.jpg"] === 1, "10 requests at once cause one download");
+  const refused = await Promise.all(["/img/w342/pendingfile1.jpg", "/img/original/posterfile1.jpg", "/img/w342/..%2F..%2Fdb.jpg", "/img/w9999/posterfile1.jpg"].map(u => fetch(base + u).then(r => r.status)));
+  check(refused.every(st => st === 404) && !upstreamHits["pendingfile1.jpg"], "unapproved files, original size and odd paths are refused without asking TMDB");
+  const bad = await Promise.all(["/img/w342/htmlfile123.jpg", "/img/w342/hugefile123.jpg"].map(u => fetch(base + u).then(r => r.status)));
+  check(bad.every(st => st === 502) && !fs.existsSync(path.join(dir, "img", "w342", "htmlfile123.jpg.webp")), "a non-image or oversized answer is refused and not saved");
+  const photoLink = (await call("GET", "/api/movies/10/credits")).json;
+  check([...photoLink.cast, ...photoLink.crew].every(p => !p.photo || p.photo.startsWith("img/w185/")), "cast and crew photos link to our own image server");
+  db.prepare("DELETE FROM movie_images").run();
 
   // Comments
   const c1 = await call("POST", "/api/movies/10/comments", { name: "Check", text: "Loved the climax" }, { asVisitor: true });
@@ -157,7 +199,7 @@ try {
   check((await call("POST", "/api/admin/reset/films", undefined, { auth: true })).json?.ok === true, "original films can be restored");
   const resetOg = (await call("GET", "/api/movies/10")).json.movie;
   check(resetOg.boxOffice.days.length === 29 && resetOg.imdbId === "tt0000010", "reset brings back the researched figures and keeps the IMDb ID");
-  check((await call("GET", "/api/admin/sync", undefined, { auth: true })).json?.tasks.length === 5, "sync status lists the five tasks");
+  check((await call("GET", "/api/admin/sync", undefined, { auth: true })).json?.tasks.length === 6, "sync status lists the six tasks");
   check((await call("POST", "/api/admin/logout", undefined, { auth: true })).status === 200, "admin signs out");
   check((await call("GET", "/api/admin/data", undefined, { auth: true })).status === 401, "signed-out cookie no longer works");
 } catch (err) {
@@ -165,6 +207,7 @@ try {
   failures++;
 } finally {
   server.close();
+  upstream.close();
   db.close();
   fs.rmSync(dir, { recursive: true, force: true });
 }

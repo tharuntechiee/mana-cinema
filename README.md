@@ -6,7 +6,7 @@ Box office collections, verdicts and ratings for Indian films in nine languages:
 
 ## What's inside
 
-- **Stars cover:** the MANA CINEMA title with Pawan Kalyan in the centre (in a red ring, opening the They Call Him OG page) and 21 heroes from all nine languages around him. Each hero opens their language's lists.
+- **Stars cover:** the MANA CINEMA title with Pawan Kalyan in the centre (in a red ring, opening the Telugu lists) and 21 heroes from all nine languages around him. Each hero opens their language's lists.
 - **New this week:** this week's releases in every language, with release status, first critics' scores and Day 1 figures as they are reported.
 - **Box office leaderboard:** rank films by opening day, opening weekend, first 7 days, lifetime India net, worldwide gross or rating. Filter by language and year, and include or leave out paid previews.
 - **Lists** (`lists.html`): for every language, the all-time top grossers (top 25 for Hindi, Telugu, Tamil, Malayalam and Kannada; top 10 for Marathi, Bengali, Punjabi and Gujarati) and the biggest opening days.
@@ -38,6 +38,14 @@ To load IMDb ratings and cast & crew, run this once. It downloads about 1.3 GB o
 ```bash
 npm run sync
 ```
+
+Posters and cast and crew photos come from TMDB. Fetch them with:
+
+```bash
+npm run sync -- images
+```
+
+Each picture is downloaded from TMDB the first time someone views it, saved in `data/cache/img`, and served from there by the site's own `/img` route. TMDB requests look up TMDB's address through public DNS (1.1.1.1, then 8.8.8.8), because some Indian internet providers block it. `TMDB_DNS` in `.env` changes this.
 
 The same syncs can be run from the admin portal's Settings page. IMDb ratings then refresh by themselves once a day while the server runs.
 

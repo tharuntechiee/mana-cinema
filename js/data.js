@@ -827,21 +827,26 @@ function esc(s) {
 
 // Optional poster photo: a file in images/posters/ (see images/README.txt) or an https address.
 // Anything else is ignored, so a typo can't break the page's styles.
-function posterImage(m) {
+// Order: a local photo set in the admin portal, else the TMDB poster the server picked (served at the
+// size asked for by our own /img route), else nothing and the drawn art shows.
+const POSTER_SIZES = ["w92", "w185", "w342", "w500", "w780"];
+function posterImage(m, size = "w342") {
   const src = String(m.image || "");
-  return /^(https:\/\/[\w.-]+\/)?[\w\-./%]+\.(jpe?g|png|webp|avif|gif)$/i.test(src) ? src : "";
+  if (/^(https:\/\/[\w.-]+\/)?[\w\-./%]+\.(jpe?g|png|webp|avif|gif)$/i.test(src)) return src;
+  const file = ONLINE ? String(m.images?.poster || "") : "";
+  return /^[A-Za-z0-9]{8,64}\.(jpg|png)$/.test(file) ? `img/${POSTER_SIZES.includes(size) ? size : "w342"}/${file}` : "";
 }
 const safeColor = c => (/^#[0-9a-f]{3,8}$/i.test(c || "") ? c : "#24242e");
 
 // HTML attribute that lets ui.js check the photo loaded
-function imgAttr(m) {
-  const src = posterImage(m);
+function imgAttr(m, size) {
+  const src = posterImage(m, size);
   return src ? `data-img="${src}"` : "";
 }
 
 // The photo (if any) sits on top of the film's colour gradient
-function posterStyle(m) {
-  const src = posterImage(m);
+function posterStyle(m, size) {
+  const src = posterImage(m, size);
   const [c1, c2] = m.colors || [];
   const photo = src ? `url('${src}') center top / cover no-repeat, ` : "";
   return `background: ${photo}linear-gradient(160deg, ${safeColor(c1)}, ${safeColor(c2)});`;

@@ -119,7 +119,7 @@ publicApi.get("/people/:id", (req, res) => {
   res.json({
     person: {
       id: person.id, name: person.name, imdbId: person.imdb_id || undefined, tmdbId: person.tmdb_id || undefined,
-      photo: person.photo ? `https://image.tmdb.org/t/p/w185${person.photo}` : undefined,
+      photo: person.photo ? `img/w185${person.photo}` : undefined,
       birthYear: person.birth_year || undefined, deathYear: person.death_year || undefined,
     },
     films,

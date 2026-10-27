@@ -3,8 +3,10 @@
 // longer "API Read Access Token" both work. Credit shown on the site:
 // "This website uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB."
 // (their terms of use also ask for the TMDB logo, less prominent than ours: add it next to this notice)
-import { db, filmsChanged, replaceCredits } from "../db.js";
+import { db, tx, filmsChanged, replaceCredits } from "../db.js";
 import { config } from "../env.js";
+import https from "node:https";
+import dns from "node:dns";
 
 const API = "https://api.themoviedb.org/3";
 const LANGUAGE_CODES = { Hindi: "hi", Telugu: "te", Tamil: "ta", Malayalam: "ml", Kannada: "kn", Marathi: "mr", Bengali: "bn", Punjabi: "pa", Gujarati: "gu" };
@@ -14,6 +16,41 @@ const pause = ms => new Promise(r => setTimeout(r, ms));
 // addresses and not others, so the same request can fail once and pass on the next try. A failed connection
 // is retried a few times; if it keeps failing, the error says what to try instead of Node's bare "fetch failed".
 const NETWORK_TRIES = 8;
+
+// Some ISPs' DNS (Jio, sometimes Airtel) answers themoviedb.org with a blocking address. TMDB's own advice
+// is to use another resolver, so TMDB requests look the name up through public DNS (TMDB_DNS in .env,
+// default 1.1.1.1 and 8.8.8.8) and fall back to the computer's normal DNS if that fails.
+// Only TMDB requests are affected; the rest of the computer keeps its own settings.
+const TMDB_DNS = String(process.env.TMDB_DNS ?? "1.1.1.1,8.8.8.8").split(",").map(x => x.trim()).filter(Boolean);
+const resolver = new dns.Resolver({ timeout: 4000, tries: 2 });
+if (TMDB_DNS.length) resolver.setServers(TMDB_DNS);
+function publicLookup(hostname, options, callback) {
+  if (typeof options === "function") { callback = options; options = {}; }
+  if (!TMDB_DNS.length) return dns.lookup(hostname, options, callback);
+  resolver.resolve4(hostname, (err, addresses) => {
+    if (err || !addresses?.length) return dns.lookup(hostname, options, callback);
+    if (options?.all) return callback(null, addresses.map(address => ({ address, family: 4 })));
+    callback(null, addresses[0], 4);
+  });
+}
+const agent = new https.Agent({ keepAlive: true, maxSockets: 6, lookup: publicLookup });
+
+// GET returning { status, headers, json() } like fetch, through the agent above
+function get(url, headers, timeout) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { headers, agent, timeout }, res => {
+      const chunks = [];
+      res.on("data", c => chunks.push(c));
+      res.on("end", () => {
+        const text = Buffer.concat(chunks).toString("utf8");
+        resolve({ status: res.statusCode, ok: res.statusCode >= 200 && res.statusCode < 300, headers: { get: h => res.headers[h.toLowerCase()] ?? null }, json: async () => JSON.parse(text) });
+      });
+      res.on("error", reject);
+    });
+    req.on("timeout", () => req.destroy(Object.assign(new Error("timed out"), { cause: { code: "ETIMEDOUT" } })));
+    req.on("error", err => reject(Object.assign(new Error("request failed"), { cause: err })));
+  });
+}
 const reason = err => err?.cause?.code || err?.cause?.message || err?.name || "network error";
 
 async function tmdb(pathname, params = {}) {
@@ -26,7 +63,7 @@ async function tmdb(pathname, params = {}) {
   for (let attempt = 0; ; attempt++) {
     let res;
     try {
-      res = await fetch(url, { headers, signal: AbortSignal.timeout(20000) });
+      res = await get(url, headers, 20000);
     } catch (err) {
       if (attempt + 1 >= NETWORK_TRIES) {
         throw Object.assign(new Error(`Couldn't reach TMDB (${reason(err)}). Your network may be blocking api.themoviedb.org: try a different DNS server (1.1.1.1 or 8.8.8.8) or a VPN, then run the sync again. It carries on where it stopped.`), { network: true });
@@ -109,4 +146,72 @@ export async function syncTmdb({ log, movieIds, refresh = false }) {
   if (missed.length) log(`Not found on TMDB (${missed.length}): ${missed.slice(0, 40).join("; ")}${missed.length > 40 ? "; ..." : ""}`);
   const later = unreachable.length ? ` ${unreachable.length} couldn't be reached: run the sync again to finish them.` : "";
   return `Loaded TMDB's full cast and crew for ${loaded} films${ids ? ` and found ${ids} more IMDb IDs` : ""}. ${missed.length} not found on TMDB.${later}`;
+}
+
+// ---------- images: every poster, backdrop and logo, and one poster per film ----------
+// One unfiltered /movie/{id}/images call per film (a language filter would drop images). Every image is
+// stored; the best poster is approved and used across the site. Choice: text in the film's own language,
+// then English, then no text; within that, TMDB's votes, then size. An admin's choice is never changed.
+const preferLang = film => [LANGUAGE_CODES[film.lang], "en", null];
+function pickPoster(film, posters) {
+  const order = preferLang(film);
+  const langRank = p => { const i = order.indexOf(p.iso_639_1 ?? null); return i < 0 ? order.length : i; };
+  return [...posters].filter(p => p.width >= 500)
+    .sort((a, b) => langRank(a) - langRank(b) || (b.vote_average || 0) - (a.vote_average || 0) || (b.vote_count || 0) - (a.vote_count || 0) || b.width - a.width)[0] || posters[0] || null;
+}
+
+export async function syncImages({ log, movieIds }) {
+  if (!config.tmdbKey) return "Skipped: add TMDB_API_KEY to .env to fetch images from TMDB.";
+  const films = db.prepare("SELECT id, title, lang, tmdb_id FROM movies WHERE tmdb_id IS NOT NULL ORDER BY id").all()
+    .filter(f => !movieIds || movieIds.includes(f.id));
+  if (!films.length) return "No film has a TMDB ID yet. Run \"Full cast and crew from TMDB\" first.";
+  log(`Fetching images for ${films.length} films from TMDB...`);
+  const now = new Date().toISOString();
+  const upsert = db.prepare(`
+    INSERT INTO movie_images (movie_id, tmdb_id, kind, file_path, width, height, aspect_ratio, lang, country, vote_average, vote_count, rank, first_seen, last_seen)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (movie_id, kind, file_path) DO UPDATE SET tmdb_id = excluded.tmdb_id, width = excluded.width, height = excluded.height,
+      aspect_ratio = excluded.aspect_ratio, lang = excluded.lang, country = excluded.country, vote_average = excluded.vote_average,
+      vote_count = excluded.vote_count, rank = excluded.rank, last_seen = excluded.last_seen, gone_at = NULL
+  `);
+  let stored = 0, posters = 0, failed = 0;
+  const empty = [];
+  for (const [i, film] of films.entries()) {
+    let res;
+    try { res = await tmdb(`/movie/${film.tmdb_id}/images`); } catch (err) {
+      if (!err.network) throw err;
+      failed++;
+      log(`  Skipped ${film.title}: ${err.message.split(". ")[0]}.`);
+      continue;
+    }
+    if (!res) { failed++; continue; }   // a 404 means "no answer", not "every image gone"
+    const kinds = { poster: res.posters || [], backdrop: res.backdrops || [], logo: res.logos || [] };
+    tx(() => {
+      for (const [kind, list] of Object.entries(kinds)) {
+        list.forEach((img, rank) => {
+          const file = String(img.file_path || "").replace(/^\//, "");
+          if (!/^[A-Za-z0-9]{8,64}\.(jpg|png)$/.test(file)) return;
+          upsert.run(film.id, film.tmdb_id, kind, file, img.width ?? null, img.height ?? null, img.aspect_ratio ?? null,
+            img.iso_639_1 ?? null, img.iso_3166_1 ?? null, img.vote_average ?? null, img.vote_count ?? null, rank, now, now);
+          stored++;
+        });
+      }
+      // Only a full answer marks missing images gone; rows from an old TMDB ID go too
+      db.prepare("UPDATE movie_images SET gone_at = ?, role = CASE WHEN chosen_by = 'admin' THEN role ELSE NULL END WHERE movie_id = ? AND gone_at IS NULL AND (last_seen < ? OR tmdb_id != ?)")
+        .run(now, film.id, now, film.tmdb_id);
+      const current = db.prepare("SELECT chosen_by FROM movie_images WHERE movie_id = ? AND role = 'poster' AND gone_at IS NULL").get(film.id);
+      if (current?.chosen_by === "admin") return;
+      const best = pickPoster(film, kinds.poster);
+      db.prepare("UPDATE movie_images SET role = NULL WHERE movie_id = ? AND role = 'poster'").run(film.id);
+      if (!best) { empty.push(film.title); return; }
+      db.prepare("UPDATE movie_images SET role = 'poster', status = 'approved', chosen_by = 'auto' WHERE movie_id = ? AND kind = 'poster' AND file_path = ?")
+        .run(film.id, best.file_path.replace(/^\//, ""));
+      posters++;
+    });
+    if ((i + 1) % 20 === 0) log(`  ${i + 1} of ${films.length} films done`);
+    await pause(60);
+  }
+  filmsChanged();
+  if (empty.length) log(`No poster on TMDB (${empty.length}): ${empty.join("; ")}`);
+  return `Stored ${stored} images and picked a poster for ${posters} of ${films.length} films.${failed ? ` ${failed} couldn't be reached: run it again to finish them.` : ""}`;
 }

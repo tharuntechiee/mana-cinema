@@ -41,6 +41,7 @@ export function tidyFilm(f) {
   if (out.tmdbId !== undefined) out.tmdbId = Number(out.tmdbId);
   if (out.trailer === null) delete out.trailer;
   delete out.credits;   // a summary the server works out; never saved
+  delete out.images;    // the same: chosen by the image sync, never saved from a form or backup
   return out;
 }
 

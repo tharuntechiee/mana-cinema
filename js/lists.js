@@ -123,7 +123,7 @@ function filmCell(m, { showVerdict = true } = {}) {
   return `
     <th scope="row" role="rowheader" class="lt-film">
       <div class="lt-film-in">
-        ${posterHTML(m, { compact: true })}
+        ${posterHTML(m, { compact: true, size: "w185" })}
         <div class="lt-film-text">
           <a class="lt-title" href="${filmURL(m)}">${esc(m.title)}</a>
           ${sub ? `<div class="lt-sub">${sub}</div>` : ""}

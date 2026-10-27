@@ -541,3 +541,7 @@ section.film-section { padding: 0; margin-top: 56px; }
   .cm-name-input { max-width: none; flex-basis: 100%; }
   .cm-form-buttons { margin-left: 0; width: 100%; justify-content: flex-end; }
 }
+
+/* Cast and crew photos (from TMDB through /img) sit over the initials, always as circles */
+.cast-avatar { position: relative; overflow: hidden; }
+.cast-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; border-radius: 50%; }

@@ -2,6 +2,10 @@
 // Values already set in the environment win, so a host's dashboard settings override the file.
 import fs from "node:fs";
 import path from "node:path";
+import dns from "node:dns";
+
+// This network has no working IPv6 route to TMDB's image server: try IPv4 addresses first
+dns.setDefaultResultOrder("ipv4first");
 
 const file = path.resolve(import.meta.dirname, "..", ".env");
 if (fs.existsSync(file)) process.loadEnvFile(file);
