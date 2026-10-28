@@ -53,7 +53,8 @@ Don't run `turso:push` again after the site is live: it replaces what the live s
    take a little while.
 2. **Senders, Domains & Dedicated IPs > Senders > Add a sender:** name `MANA CINEMA`, and the email address
    the codes should come from (for example a Gmail you made for the site). Confirm it from that inbox.
-3. **SMTP & API > API keys > Generate a new API key.** Copy it (it's shown once).
+3. **SMTP & API > API keys > Generate a new API key.** Copy it (it's shown once). It starts with `xkeysib-`.
+   Not the SMTP key on the SMTP tab (`xsmtpsib-...`): the API refuses that one with "Key not found".
 
 About Gmail as the sender: Brevo can't prove a gmail.com address is allowed to send through it, so it may
 send from a Brevo address on your behalf, and some codes may land in spam. When you buy a domain, add it in

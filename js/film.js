@@ -1011,6 +1011,7 @@ function renderRatings() {
     ? `
       <p class="rating-big"><span class="score">${imdb.score.toFixed(1)}</span><small>/10</small></p>
       <p class="rating-sub">${imdb.votes ? `${esc(imdb.votes)} votes` : "Votes not recorded"}${imdb.asOf ? ` · as of ${esc(isoLabel(imdb.asOf) || imdb.asOf)}` : ""}</p>
+      ${imdbFewVotes(film) ? `<p class="few-votes">Few votes so far, so this can change a lot. It isn't counted in the overall score until ${IMDB_MIN_VOTES.toLocaleString("en-IN")} votes.</p>` : ""}
       <p class="fine-print">${fromImdb ? `Updated daily from IMDb.${imdbLink}<br>${IMDB_CREDIT}` : `A snapshot. IMDb ratings keep moving.${imdbLink}`}</p>`
     : `<p class="rating-none">No IMDb rating yet.${imdbLink}</p>`;
 
@@ -1667,5 +1668,24 @@ function renderPage() {
   if (due.length) toast(due.length === 1 ? `${due[0].title} is out now.` : `${due.length} films you follow are out now.`);
 }
 
-if (!film) location.replace("index.html#films");
+// A link to a film that isn't here (removed, or a typo): say so, rather than jumping elsewhere
+function renderMissing() {
+  document.title = "Film not found | MANA CINEMA";
+  $("filmTabs").hidden = true;
+  document.querySelector(".film-back").hidden = true;
+  $("main").querySelectorAll(".film-section").forEach(s => { s.hidden = true; });
+  $("filmHead").innerHTML = `
+    <div class="film-missing">
+      <h1>Film not found</h1>
+      <p>We couldn't find this film on MANA CINEMA. The link may be mistyped, or the film was removed.</p>
+      <div class="film-missing-actions">
+        <a class="btn btn-primary" href="index.html#films">${icon("film")}<span>Browse all films</span></a>
+        <button type="button" class="btn btn-ghost" id="missingSearch">${icon("search")}<span>Search</span></button>
+      </div>
+    </div>`;
+  $("missingSearch").addEventListener("click", () => $("searchBtn")?.click());
+  icons();
+}
+
+if (!film) renderMissing();
 else renderPage();

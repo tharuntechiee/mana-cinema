@@ -5,18 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0F0F13">
   <meta name="robots" content="noindex">
+  <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="images/icon-192.png" sizes="192x192" type="image/png">
+  <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+  <meta name="robots" content="noindex">
   <script>document.documentElement.dataset.theme="district"</script>
   <title>Admin | MANA CINEMA</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=11">
-  <link rel="stylesheet" href="css/admin.css?v=6">
+  <link rel="stylesheet" href="css/style.css?v=12">
+  <link rel="stylesheet" href="css/admin.css?v=7">
 </head>
 <body class="admin-page">
 
   <!-- Sign in -->
-  <div class="admin-login" id="login">
+  <main class="admin-login" id="login">
     <form class="login-card" id="loginForm">
       <a href="index.html" class="logo"><span class="logo-mark"><i data-lucide="clapperboard"></i></span>MANA&nbsp;<span>CINEMA</span></a>
       <h1>Admin portal</h1>
@@ -29,7 +33,7 @@
       <button class="btn btn-primary btn-block" type="submit"><i data-lucide="log-in"></i> Sign in</button>
       <a href="index.html" class="admin-back"><i data-lucide="arrow-left"></i> Back to website</a>
     </form>
-  </div>
+  </main>
 
   <!-- Portal -->
   <div class="admin-app" id="app" hidden>
@@ -411,7 +415,12 @@
         <div class="form-row three">
           <div class="field"><label for="fColor1">Poster colour 1</label><input id="fColor1" type="color" value="#d63bff"></div>
           <div class="field"><label for="fColor2">Poster colour 2</label><input id="fColor2" type="color" value="#0c0716"></div>
-          <div class="field"><label for="fImage">Photo file (optional)</label><input id="fImage" maxlength="200" placeholder="images/posters/name.jpg" aria-describedby="fImageHint"><small class="field-hint" id="fImageHint">images/posters/name.jpg or an https link</small></div>
+          <div class="field"><label for="fImage">Photo file (optional)</label><input id="fImage" maxlength="200" placeholder="images/posters/name.jpg" aria-describedby="fImageHint"><small class="field-hint" id="fImageHint">Used only when the film has no TMDB poster: images/posters/name.jpg or an https link</small></div>
+        </div>
+        <div class="field poster-picker" id="posterPicker" hidden>
+          <span class="picker-label" id="posterPickerLabel">Poster on the site</span>
+          <div class="poster-strip" id="posterStrip" role="group" aria-labelledby="posterPickerLabel"></div>
+          <small class="field-hint" id="posterHint">Every poster TMDB has for this film. Click one to show it on the site; it's saved straight away.</small>
         </div>
       </div>
       <div class="dialog-foot">
@@ -424,11 +433,11 @@
 
   <script src="api/bootstrap.js"></script>
   <script src="js/films-india.js?v=4"></script>
-  <script src="js/data.js?v=7"></script>
+  <script src="js/data.js?v=8"></script>
   <script src="js/art.js?v=6"></script>
   <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" integrity="sha384-ieG+IKD0d/ZPXyCBTMVAbqsQdns8QGJR/e26WMw7M4fkaI/rHcS/YIoi+ah9WGge" crossorigin="anonymous"></script>
   <script src="js/ui.js?v=8"></script>
-  <script src="js/boxoffice.js?v=5"></script>
-  <script src="js/admin.js?v=6"></script>
+  <script src="js/boxoffice.js?v=6"></script>
+  <script src="js/admin.js?v=7"></script>
 </body>
 </html>

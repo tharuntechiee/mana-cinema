@@ -545,3 +545,12 @@ section.film-section { padding: 0; margin-top: 56px; }
 /* Cast and crew photos (from TMDB through /img) sit over the initials, always as circles */
 .cast-avatar { position: relative; overflow: hidden; }
 .cast-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; border-radius: 50%; }
+
+/* A link to a film that isn't here */
+.film-missing { max-width: 560px; padding: 48px 0 72px; }
+.film-missing h1 { font-size: clamp(2rem, 5vw, 2.75rem); line-height: 1.1; margin-bottom: 12px; }
+.film-missing p { color: var(--text-soft); line-height: 1.6; margin-bottom: 24px; }
+.film-missing-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.film-missing-actions .btn { gap: 8px; }
+.few-votes { margin-top: 8px; padding: 8px 10px; border-radius: var(--radius-sm); background: rgba(var(--gold-rgb), .1); color: var(--text-soft); font-size: var(--fs-small); line-height: 1.5; }
+

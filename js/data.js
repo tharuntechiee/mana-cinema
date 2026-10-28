@@ -831,14 +831,16 @@ function esc(s) {
 
 // Optional poster photo: a file in images/posters/ (see images/README.txt) or an https address.
 // Anything else is ignored, so a typo can't break the page's styles.
-// Order: a local photo set in the admin portal, else the TMDB poster the server picked (served at the
-// size asked for by our own /img route), else nothing and the drawn art shows.
+// Order: on the server, the film's real TMDB poster (served at the size asked for by our own /img route);
+// else a local photo set in the admin portal (the only picture without the server); else nothing and the
+// drawn art shows. The real poster comes first because the original catalogue's local photos for OG,
+// Pushpa 2, Kalki and Devara are photos of their stars, not posters.
 const POSTER_SIZES = ["w92", "w185", "w342", "w500", "w780"];
 function posterImage(m, size = "w342") {
-  const src = String(m.image || "");
-  if (/^(https:\/\/[\w.-]+\/)?[\w\-./%]+\.(jpe?g|png|webp|avif|gif)$/i.test(src)) return src;
   const file = ONLINE ? String(m.images?.poster || "") : "";
-  return /^[A-Za-z0-9]{8,64}\.(jpg|png)$/.test(file) ? `img/${POSTER_SIZES.includes(size) ? size : "w342"}/${file}` : "";
+  if (/^[A-Za-z0-9]{8,64}\.(jpg|png)$/.test(file)) return `img/${POSTER_SIZES.includes(size) ? size : "w342"}/${file}`;
+  const src = String(m.image || "");
+  return /^(https:\/\/[\w.-]+\/)?[\w\-./%]+\.(jpe?g|png|webp|avif|gif)$/i.test(src) ? src : "";
 }
 const safeColor = c => (/^#[0-9a-f]{3,8}$/i.test(c || "") ? c : "#24242e");
 

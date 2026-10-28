@@ -44,6 +44,8 @@ const SENDERS = {
   },
   brevo: async (to, code, minutes) => {
     if (!config.brevoKey || !config.mailFrom) throw new Error("BREVO_API_KEY and MAIL_FROM aren't set");
+    // Brevo has two kinds of key; its SMTP key (xsmtpsib-) is refused by the API with "Key not found"
+    if (config.brevoKey.startsWith("xsmtpsib-")) throw new Error("BREVO_API_KEY is Brevo's SMTP key (xsmtpsib-...). Make an API key instead: Brevo > SMTP & API > API keys (it starts xkeysib-)");
     const m = message(code, minutes);
     const res = await fetch(config.brevoUrl, {
       method: "POST",

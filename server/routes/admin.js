@@ -6,6 +6,8 @@
 //   GET    /api/admin/data                every film, audience review (hidden ones too) and message
 //   PUT    /api/admin/movies/:id          add or replace a film (details, collections, critics, IDs, trailer)
 //   DELETE /api/admin/movies/:id          delete a film and everything about it
+//   GET    /api/admin/movies/:id/posters  every TMDB poster of the film, the one shown first
+//   PUT    /api/admin/movies/:id/poster   { imageId }  show this poster (the TMDB sync keeps an admin's choice)
 //   PATCH  /api/admin/reviews/:id         { hidden }
 //   DELETE /api/admin/reviews/:id
 //   GET    /api/admin/users               viewers' accounts, with how many ratings and comments each posted
@@ -24,7 +26,7 @@
 //   POST   /api/admin/sync                { tasks: ["ratings", ...] or ["all"], movieIds? }
 import express from "express";
 import { rateLimit } from "express-rate-limit";
-import { db, tx, readFilms, readFilm, writeFilm, deleteFilm, reviewOut, messageOut, setMeta, nowISO } from "../db.js";
+import { db, tx, readFilms, readFilm, writeFilm, deleteFilm, reviewOut, messageOut, setMeta, nowISO, filmsChanged } from "../db.js";
 import { passwordMatches, startSession, endSession, isAdmin, requireAdmin } from "../auth.js";
 import { config } from "../env.js";
 import { filmProblem, tidyFilm, backupProblem } from "../validate.js";
@@ -86,6 +88,32 @@ adminApi.delete("/movies/:id", (req, res) => {
   const out = id ? deleteFilm(id) : { deleted: false };
   if (!out.deleted) return res.status(404).json({ error: "That film was already deleted." });
   res.json({ ok: true, reviews: out.reviews });
+});
+
+// ---------- Posters (from the TMDB images sync) ----------
+const posterOut = r => ({ id: r.id, file: r.file_path, lang: r.lang || null, votes: r.vote_count || 0, width: r.width, height: r.height, chosen: r.role === "poster", by: r.role === "poster" ? r.chosen_by : undefined });
+const filmPosters = id => db.prepare(`
+  SELECT * FROM movie_images WHERE movie_id = ? AND kind = 'poster' AND gone_at IS NULL AND status != 'hidden'
+  ORDER BY role = 'poster' DESC, rank
+`).all(id).map(posterOut);
+
+adminApi.get("/movies/:id/posters", (req, res) => {
+  const id = idParam(req);
+  if (!id || !db.prepare("SELECT 1 FROM movies WHERE id = ?").get(id)) return res.status(404).json({ error: "That film doesn't exist." });
+  res.json({ posters: filmPosters(id) });
+});
+
+adminApi.put("/movies/:id/poster", (req, res) => {
+  const id = idParam(req);
+  const imageId = Number(req.body?.imageId);
+  const image = id && Number.isSafeInteger(imageId) && db.prepare("SELECT * FROM movie_images WHERE id = ? AND movie_id = ? AND kind = 'poster' AND gone_at IS NULL").get(imageId, id);
+  if (!image) return res.status(404).json({ error: "That poster isn't on TMDB any more. Run the images sync." });
+  tx(() => {
+    db.prepare("UPDATE movie_images SET role = NULL WHERE movie_id = ? AND role = 'poster'").run(id);
+    db.prepare("UPDATE movie_images SET role = 'poster', status = 'approved', chosen_by = 'admin' WHERE id = ?").run(imageId);
+  });
+  filmsChanged();
+  res.json({ posters: filmPosters(id), movie: readFilm(id) });
 });
 
 // ---------- Audience reviews ----------

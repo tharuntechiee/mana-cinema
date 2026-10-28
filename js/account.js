@@ -30,6 +30,7 @@ let openAccount = () => {};
     btn.title = ME.name;
     btn.innerHTML = `<span aria-hidden="true">${esc(acInitials(ME.name))}</span>`;
   } else {
+    btn.setAttribute("aria-label", "Sign in");   // on phones only the icon shows
     btn.innerHTML = `<i data-lucide="user-round"></i><span>Sign in</span>`;
   }
   nav.appendChild(btn);

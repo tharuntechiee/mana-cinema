@@ -10,6 +10,7 @@ import { publicApi } from "./routes/public.js";
 import { adminApi } from "./routes/admin.js";
 import { accountApi } from "./routes/account.js";
 import { imageRoute } from "./images.js";
+import { sharePage } from "./share.js";
 
 export function createApp() {
   const app = express();
@@ -61,9 +62,10 @@ export function createApp() {
 
   // ---------- Website ----------
   const PAGES = ["index.html", "film.html", "lists.html", "admin.html", "privacy.html"];
+  // Public pages get link-preview tags (share.js); the admin page is sent as it is
   const page = name => (req, res) => res.set("Cache-Control", "no-cache").sendFile(path.join(ROOT, name));
-  app.get("/", page("index.html"));
-  for (const name of PAGES) app.get(`/${name}`, page(name));
+  app.get("/", sharePage("index.html"));
+  for (const name of PAGES) app.get(`/${name}`, name === "admin.html" ? page(name) : sharePage(name));
   for (const dir of ["css", "js", "images"]) {
     app.use(`/${dir}`, express.static(path.join(ROOT, dir), { maxAge: "1h", dotfiles: "ignore", index: false, fallthrough: true }));
   }

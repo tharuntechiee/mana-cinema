@@ -447,7 +447,7 @@ section { padding: 80px 0; }
 /* Charcoal band, white sentence-case headings, grey links */
 footer { background: var(--surface-2); border-top: 1px solid var(--border); padding: 56px 0 28px; margin-top: 40px; }
 .footer-grid { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 32px; }
-.footer-grid h4 { font-size: var(--fs-small); font-weight: 700; line-height: 1.4; color: var(--text); margin-bottom: 14px; }
+.footer-grid h2 { font-size: var(--fs-small); font-weight: 700; line-height: 1.4; color: var(--text); margin-bottom: 14px; }
 .footer-grid ul { list-style: none; display: grid; gap: 10px; }
 .footer-grid a { color: var(--muted); font-size: var(--fs-small); font-weight: 500; transition: color .2s; }
 .footer-grid a:hover { color: var(--text); }
@@ -1105,7 +1105,7 @@ body::after { opacity: calc(var(--pattern-opacity) * .45); }
 .board-control { display: grid; gap: 8px; }
 .board-label { font-size: var(--fs-label); font-weight: 500; line-height: 1.5; color: var(--muted); }
 .toggle-check { display: inline-flex; align-items: center; gap: 10px; min-height: 36px; font-size: var(--fs-small); font-weight: 600; color: var(--text-soft); cursor: pointer; }
-.toggle-check input { width: 18px; height: 18px; padding: 0; flex: 0 0 auto; accent-color: var(--accent); cursor: pointer; }
+.toggle-check input { width: 20px; height: 20px; padding: 0; flex: 0 0 auto; accent-color: var(--accent); cursor: pointer; }
 .toggle-check input:focus { box-shadow: none; }
 .toggle-check input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .board-notes { display: grid; gap: 2px; margin: 20px 0 4px; padding-top: 16px; border-top: 1px solid var(--border); }
@@ -1269,9 +1269,12 @@ body::after { opacity: calc(var(--pattern-opacity) * .45); }
   .board-value { flex-basis: 7rem; }   /* a fixed width keeps every bar track the same length, so bars compare */
   .film-search { width: 100%; }
   .track-stats dd { font-size: 1.5rem; }
-  /* One column of glossary cards: the icon sits beside the text to keep each card short */
-  .glossary .feature { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 14px; padding: 16px; }
-  .glossary .feature-icon { grid-row: span 2; margin: 0; }
+  /* One column of glossary cards: the icon sits beside the term to keep each card short, and the
+     description lines up under the term's text */
+  .glossary .feature { padding: 16px; }
+  .glossary dt { display: flex; align-items: center; gap: 14px; }
+  .glossary .feature-icon { flex: 0 0 auto; margin: 0; }
+  .glossary dd { margin-left: 50px; }
   .form-submit { justify-self: stretch; }
 }
 @media (max-width: 480px) {

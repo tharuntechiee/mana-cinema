@@ -787,9 +787,52 @@ function openFilm(id = null) {
   $("fColor2").value = /^#[0-9a-f]{6}$/i.test(m.colors?.[1] || "") ? m.colors[1] : DEFAULT_COLORS[1];
   syncFilmForm();
   filmSnapshot = JSON.stringify(formFilm());
+  loadPosters(id);
   $("filmDialog").showModal();
   $("fTitle").focus();
   icons();
+}
+
+// ---------- Poster picker (server only) ----------
+// Every TMDB poster of the film as a thumbnail (straight from TMDB's image server, since only the chosen one
+// is served by our /img route); clicking one makes it the film's poster everywhere on the site.
+const TMDB_THUMB = "https://image.tmdb.org/t/p/w154/";
+async function loadPosters(id) {
+  const box = $("posterPicker"), strip = $("posterStrip");
+  box.hidden = true;
+  strip.replaceChildren();
+  if (!ONLINE || id === null) return;
+  let posters;
+  try { posters = (await api(`admin/movies/${id}/posters`)).posters; } catch { return; }
+  if (editingId !== id || !posters.length) return;
+  const draw = list => {
+    strip.innerHTML = list.map((p, i) => `
+      <button type="button" class="poster-pick${p.chosen ? " is-chosen" : ""}" data-image="${p.id}" aria-pressed="${p.chosen}"
+        title="${esc([p.lang ? `Language: ${p.lang}` : "No text", `${p.votes} TMDB votes`, p.chosen ? (p.by === "admin" ? "Chosen by you" : "Picked by the sync") : ""].filter(Boolean).join(" · "))}">
+        <img src="${TMDB_THUMB}${esc(p.file)}" alt="Poster ${i + 1}${p.lang ? `, ${esc(p.lang)}` : ""}${p.chosen ? ", shown now" : ""}" loading="lazy" width="77" height="116">
+        ${p.chosen ? `<span class="pick-badge">Shown</span>` : ""}
+      </button>`).join("");
+  };
+  draw(posters);
+  box.hidden = false;
+  strip.onclick = async e => {
+    const btn = e.target.closest(".poster-pick");
+    if (!btn || btn.classList.contains("is-chosen") || strip.dataset.busy) return;
+    strip.dataset.busy = "1";
+    try {
+      const out = await api(`admin/movies/${id}/poster`, { method: "PUT", body: { imageId: Number(btn.dataset.image) } });
+      const i = live.movies.findIndex(m => m.id === id);
+      if (i >= 0) live.movies[i] = out.movie;
+      draw(out.posters);
+      syncFilmForm();   // the preview shows the new poster
+      toast("Poster changed. It shows on the site now.");
+      renderFilms();
+    } catch (err) {
+      saveFailed(err);
+    } finally {
+      delete strip.dataset.busy;
+    }
+  };
 }
 
 // Original language: the menu's choice, or the "Other…" box. Typed in any case, a listed language
@@ -876,7 +919,9 @@ function syncFilmForm() {
     : imdbClash ? `${imdbClash.title} already has this IMDb ID.` : "");
   $("fTmdb").setCustomValidity($("fTmdb").value.trim() && !data.tmdbId ? "A TMDB ID is the number in the film's TMDB address." : "");
   $("fTrailer").setCustomValidity($("fTrailer").value.trim() && !data.trailer ? "Paste a YouTube video link or its 11-character ID." : "");
-  $("filmPreview").innerHTML = posterHTML({ ...data, title: data.title || "Preview" }, { compact: true });
+  // The form has no poster field: the preview borrows the film's chosen TMDB poster, as the site shows it
+  const images = editingId !== null ? live.movies.find(m => m.id === editingId)?.images : undefined;
+  $("filmPreview").innerHTML = posterHTML({ ...data, images, title: data.title || "Preview" }, { compact: true });
   markPhotos($("filmPreview"));
 }
 $("filmForm").addEventListener("input", syncFilmForm);

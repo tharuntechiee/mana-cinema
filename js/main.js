@@ -91,7 +91,7 @@ function heroFactsHTML(m) {
 // Headline figures on a carousel slide. A figure that isn't reported is left out, never shown as 0.
 // The rating is IMDb's, else the critics' average.
 function statsHTML(m) {
-  const od = openingDay(m), ww = worldwideGross(m), imdb = imdbScore(m), cs = imdb ? null : criticsScore(m);
+  const od = openingDay(m), ww = worldwideGross(m), imdb = imdbFewVotes(m) ? null : imdbScore(m), cs = imdb ? null : criticsScore(m);
   const items = [
     od !== null && ["Opening day", `<span class="money">${crore(od)}</span>${openingHasPreviews(m) ? "<small>incl. previews</small>" : ""}`],
     ww !== null && ["Worldwide gross", `<span class="money">${crore(ww)}</span>`],
@@ -570,6 +570,8 @@ function weekCard(m) {
 }
 
 (function renderNewThisWeek() {
+  // A quiet week: no empty box on the home page (the next release is in the pulse tiles and Coming soon)
+  $("new-this-week").hidden = !newThisWeek.length;
   $("newWeekRange").textContent = `Releases from ${dayLabel(weekStart)} to ${dayLabel(weekEnd)}`;
   const grid = $("newWeekGrid");
   grid.classList.toggle("is-empty", !newThisWeek.length);
@@ -785,7 +787,7 @@ function filmCard(m) {
   const score = filmFacts(m).score;
   return `
     <article class="movie-card film-card reveal">
-      ${cardPoster(m, verdictHTML(m))}
+      ${cardPoster(m, verdictHTML(m, { short: true }))}
       <div class="card-info">
         <h3 class="card-title"><a class="card-link" href="${filmURL(m)}">${esc(m.title)}</a></h3>
         ${pipeLine([m.cert && esc(m.cert), m.lang && esc(m.lang), yearOf(m)], "card-meta")}

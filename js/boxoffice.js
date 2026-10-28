@@ -345,6 +345,11 @@ function criticsScore(m) {
 }
 
 // IMDb rating out of 10: a snapshot entered by the admin, with its vote count and date
+// Below IMDB_MIN_VOTES votes (a new or small film, often rated mostly by fans) the rating is shown on the
+// film page with a note, but left out of the overall score, so it can't top the Top rated list.
+const IMDB_MIN_VOTES = 1000;
+const imdbVotes = i => Number(String(i?.votes ?? "").replace(/[^\d]/g, "")) || 0;
+const imdbFewVotes = m => { const i = imdbScore(m); return Boolean(i && i.votes && imdbVotes(i) < IMDB_MIN_VOTES); };
 function imdbScore(m) {
   const i = m.critics?.imdb || {};
   const score = boNum(i.score);
@@ -396,7 +401,7 @@ function weightedAudience(movieId, prior = AUDIENCE_PRIOR) {
 // Audience ratings lean towards the film's own critics/IMDb level, so a low rating can only lower the score.
 // With no critics or IMDb score, a film needs AUDIENCE_MIN_VOTES ratings before it gets an overall score.
 function overallScore(m) {
-  const base = [criticsScore(m)?.score, imdbScore(m)?.score].filter(v => v !== null && v !== undefined);
+  const base = [criticsScore(m)?.score, imdbFewVotes(m) ? null : imdbScore(m)?.score].filter(v => v !== null && v !== undefined);
   if (!base.length && audienceScore(m.id).count < AUDIENCE_MIN_VOTES) return null;
   const aud = weightedAudience(m.id, base.length ? boSum(base) / base.length / 2 : AUDIENCE_PRIOR);
   const parts = aud === null ? base : [...base, aud * 2];
@@ -537,10 +542,11 @@ function starsHTML(value, { size = "" } = {}) {
 }
 
 // Verdict badge. An asterisk marks an indicative or still-running verdict. Styles: .verdict in css/style.css
-function verdictHTML(m) {
+// short: on a poster, a running film's badge leaves out "Trending: " (the asterisk and the hover text say it)
+function verdictHTML(m, { short = false } = {}) {
   const v = verdict(m);
   if (!v) return "";
   const title = v.indicative ? INDICATIVE_BASIS : `Trade verdict${v.source ? " · " + v.source : ""}`;
-  const label = v.running ? `Trending: ${v.label}` : v.label;
+  const label = v.running && !short ? `Trending: ${v.label}` : v.label;
   return `<span class="verdict verdict-${v.tone}" title="${esc(title + (v.running ? ". Still in theatres, so it may change." : ""))}">${esc(label)}${v.indicative || v.running ? "*" : ""}</span>`;
 }

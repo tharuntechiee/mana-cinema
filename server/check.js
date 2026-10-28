@@ -374,6 +374,26 @@ try {
 
   console.log = log;
   Object.assign(config, { emailSender: "", googleClientId: "" });
+  // Link previews, a film that isn't here, and the admin's poster picker
+  const homePage = (await call("GET", "/")).text;
+  check(/<meta property="og:image" content="http:\/\/localhost:\d+\/images\/og-cover\.png">/.test(homePage) && homePage.includes('name="twitter:card"') && homePage.includes('rel="canonical"'), "the home page has link-preview tags");
+  const ogPage = await call("GET", "/film.html?id=10");
+  check(ogPage.status === 200 && ogPage.text.includes("<title>They Call Him OG Box Office Collection &amp; Ratings | MANA CINEMA</title>") && /og:title" content="They Call Him OG/.test(ogPage.text), "a film page's preview has the film's title");
+  const missingPage = await call("GET", "/film.html?id=999999");
+  check(missingPage.status === 404 && missingPage.text.includes("film.js"), "a film that isn't here is a 404, still showing the page");
+  check(!(await call("GET", "/admin.html")).text.includes("og:title"), "the admin page has no preview tags");
+  db.prepare("DELETE FROM movie_images WHERE movie_id = 10").run();
+  const addPoster = db.prepare("INSERT INTO movie_images (movie_id, tmdb_id, kind, file_path, rank, status, role, chosen_by, first_seen, last_seen) VALUES (10, 1, 'poster', ?, ?, ?, ?, ?, 'x', 'x')");
+  addPoster.run("autoposter1.jpg", 0, "approved", "poster", "auto");
+  const pickId = Number(addPoster.run("otherposter2.jpg", 1, "pending", null, null).lastInsertRowid);
+  const listed = (await call("GET", "/api/admin/movies/10/posters", undefined, { auth: true })).json?.posters || [];
+  check(listed.length === 2 && listed[0].chosen && listed[0].file === "autoposter1.jpg", "admin sees every poster of a film, the shown one first");
+  check((await call("PUT", "/api/admin/movies/10/poster", { imageId: pickId })).status === 401, "only the admin can change a poster");
+  const picked = await call("PUT", "/api/admin/movies/10/poster", { imageId: pickId }, { auth: true });
+  check(picked.json?.movie.images.poster === "otherposter2.jpg" && picked.json.posters.find(p => p.chosen).by === "admin", "admin chooses another poster");
+  check((await call("GET", "/img/w185/otherposter2.jpg")).status === 200, "the chosen poster is served");
+  check((await call("PUT", "/api/admin/movies/10/poster", { imageId: 999999 }, { auth: true })).status === 404, "a poster from another film can't be chosen");
+
   // Database copies in Turso (for hosts that wipe their disk): a local libSQL file stands in for Turso
   const snap = await import("./snapshot.js");
   const { DB_FILE } = await import("./paths.js");
