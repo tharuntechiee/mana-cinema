@@ -1406,6 +1406,9 @@ html.search-open { overflow: hidden; }
 .account-body { display: grid; gap: 16px; padding: 20px 22px 22px; }
 .account-lead { color: var(--text-soft); font-size: var(--fs-small); line-height: 1.6; }
 .gsi-slot { display: grid; justify-items: center; gap: 8px; min-height: 44px; }
+/* Google's button frame is a light page; on our dark page the browser paints a white box behind it
+   unless the frame is marked light too */
+.gsi-slot iframe { color-scheme: light; }
 .account-or { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: var(--fs-small); white-space: nowrap; }
 .account-or::before, .account-or::after { content: ""; flex: 1; height: 1px; background: var(--border-strong); }
 .code-form { display: grid; gap: 12px; }
