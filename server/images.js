@@ -1,13 +1,14 @@
 // GET /img/:size/:file — film posters and people's photos, fetched from TMDB's image server the first time
 // they're asked for, saved to disk, and served from disk after that. Visitors only ever contact this site.
 //
-// Only files the database allows can be served: approved film images (movie_images) and the profile
-// photos of credited people. Anything else is a 404 with no request to TMDB, so this can't be used as an
+// Only files the database allows can be served: approved film images (movie_images), the profile
+// photos of credited people, and the photos and film posters on people's pages and in search. Anything else is a 404 with no request to TMDB, so this can't be used as an
 // open proxy. Sizes are limited to what each kind needs; "original" (up to 2 MB) is never allowed.
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { db, DATA_DIR, ROOT, currentFilmsVersion } from "./db.js";
+import { personImage } from "./people.js";
 
 const CACHE_DIR = process.env.IMAGE_CACHE_DIR ? path.resolve(ROOT, process.env.IMAGE_CACHE_DIR) : path.join(DATA_DIR, "cache", "img");
 const UPSTREAM = (process.env.IMAGE_UPSTREAM || "https://image.tmdb.org/t/p").replace(/\/$/, "");
@@ -70,7 +71,7 @@ async function download(size, name) {
       if (bytes > MAX_BYTES) throw Object.assign(new Error("image too large"), { status: 502 });
       chunks.push(chunk);
     }
-    if (!allowed().has(name)) throw Object.assign(new Error("hidden while downloading"), { status: 404 });
+    if (!allowed().has(name) && !personImage(name)) throw Object.assign(new Error("hidden while downloading"), { status: 404 });
     const dir = path.join(CACHE_DIR, size);
     fs.mkdirSync(dir, { recursive: true });
     const file = path.join(dir, name + TYPES[type]);
@@ -96,7 +97,8 @@ async function download(size, name) {
 
 export async function imageRoute(req, res) {
   const { size, file: name } = req.params;
-  const kind = NAME.test(name || "") ? allowed().get(name) : null;
+  // Else a person's photo or one of their films' posters, on their page or in search (server/people.js)
+  const kind = NAME.test(name || "") ? allowed().get(name) || personImage(name) : null;
   if (!kind || !SIZES[kind].includes(size)) return res.status(404).set("Cache-Control", "no-store").type("text").send("Not found");
   try {
     let hit = cached(size, name);

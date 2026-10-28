@@ -164,11 +164,14 @@ const starRings = (() => {
 const starStage = $("starStage");
 
 // One star: the photo in a circle, the name under it, then the language (shown in the grid and the
-// phone row; on the rings it appears on hover). The link's name says where it goes.
+// phone row; on the rings it appears on hover). It opens their page (person.html: films, box office,
+// biography), or their language's lists for a star without a TMDB id.
 const listsLink = s => `lists.html?lang=${esc(encodeURIComponent(s.lang))}`;
+const starLink = s => (Number.isInteger(s.tmdb) ? `person.html?id=${s.tmdb}` : listsLink(s));
+const starLabel = s => (Number.isInteger(s.tmdb) ? `${s.name}: films, box office and biography` : `${s.name}: ${s.lang} box office lists`);
 function starHTML(s, i) {
   return `
-    <a class="star" href="${listsLink(s)}" aria-label="${esc(`${s.name}: ${s.lang} box office lists`)}" style="--i:${i}">
+    <a class="star" href="${starLink(s)}" aria-label="${esc(starLabel(s))}" style="--i:${i}">
       <span class="star-photo"><img src="${esc(s.img)}" width="360" height="360" alt="${esc(s.name)}" decoding="async" loading="lazy"></span>
       <span class="star-name">${esc(s.name)}</span>
       <span class="star-lang">${esc(s.lang)}</span>
@@ -176,10 +179,10 @@ function starHTML(s, i) {
 }
 
 // The centre: his photo in a red ring, with his name and language under it like the others; without a photo, the site's own They Call Him OG
-// drawing (js/art.js). Like every hero around it, it opens his language's lists (Telugu).
+// drawing (js/art.js). Like every hero around it, it opens his page.
 function leadHTML(s) {
-  const href = listsLink(s);
-  const label = `${s.name}: ${s.lang} box office lists`;
+  const href = starLink(s);
+  const label = starLabel(s);
   const picture = s.img
     ? `<span class="star-photo"><img src="${esc(s.img)}" width="400" height="400" alt="${esc(s.name)}" decoding="async" loading="eager" fetchpriority="high"></span>`
     : `<span class="star-photo star-art">${heroArt({ art: "og" }, "star-art-svg", "xMidYMid")}</span>`;

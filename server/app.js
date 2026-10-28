@@ -61,7 +61,7 @@ export function createApp() {
   app.get("/img/:size/:file", imageRoute);
 
   // ---------- Website ----------
-  const PAGES = ["index.html", "film.html", "lists.html", "admin.html", "privacy.html"];
+  const PAGES = ["index.html", "film.html", "person.html", "lists.html", "admin.html", "privacy.html"];
   // Public pages get link-preview tags (share.js); the admin page is sent as it is
   const page = name => (req, res) => res.set("Cache-Control", "no-cache").sendFile(path.join(ROOT, name));
   app.get("/", sharePage("index.html"));

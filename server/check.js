@@ -13,6 +13,8 @@ process.env.IMAGE_CACHE_DIR = path.join(dir, "img");
 process.env.EMAIL_SENDER = "";
 process.env.GOOGLE_CLIENT_ID = "";
 process.env.TURSO_DATABASE_URL = "";
+// No calls to the real TMDB: people's pages use the bundled profiles
+process.env.TMDB_API_KEY = "";
 
 // A stand-in for TMDB's image server: a tiny WebP, a slow answer, an HTML page and a too-large file
 const http = await import("node:http");
@@ -393,6 +395,24 @@ try {
   check(picked.json?.movie.images.poster === "otherposter2.jpg" && picked.json.posters.find(p => p.chosen).by === "admin", "admin chooses another poster");
   check((await call("GET", "/img/w185/otherposter2.jpg")).status === 200, "the chosen poster is served");
   check((await call("PUT", "/api/admin/movies/10/poster", { imageId: 999999 }, { auth: true })).status === 404, "a poster from another film can't be chosen");
+  // A person's page: the bundled profile, their films here, link previews and their posters
+  const seedPeople = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, "people-seed.json"), "utf8"));
+  const pk = db.prepare("INSERT INTO people (name, tmdb_id) VALUES ('Pawan Kalyan', 237048)").run().lastInsertRowid;
+  db.prepare("INSERT INTO credits (movie_id, person_id, kind, character, position, source) VALUES (10, ?, 'cast', 'OG', 0, 'tmdb')").run(pk);
+  const pkPage = await call("GET", "/api/people/tmdb/237048");
+  check(pkPage.status === 200 && pkPage.json?.person.name === "Pawan Kalyan" && pkPage.json.person.films.length === seedPeople[237048].films.length, "a cover star's page has their bundled filmography");
+  check(pkPage.json?.person.siteFilms.some(f => f.movieId === 10 && f.roles.includes("OG")), "a person's page lists their films here with the role");
+  check((await call("GET", "/api/people/tmdb/999999998")).status === 404 && (await call("GET", "/api/people/tmdb/abc")).status === 404, "someone not credited here has no page");
+  const pkShare = await call("GET", "/person.html?id=237048");
+  check(pkShare.status === 200 && pkShare.text.includes("<title>Pawan Kalyan: Films, Box Office &amp; Biography | MANA CINEMA</title>") && /og:image" content="http:\/\/localhost:\d+\/img\/h632\//.test(pkShare.text), "a person's page preview has their name and photo");
+  check((await call("GET", "/person.html?id=999999998")).status === 404, "a person who isn't here is a 404, still showing the page");
+  const filmPoster = seedPeople[237048].films.find(f => f.poster && !f.movieId).poster;
+  check((await call("GET", `/img/w92${filmPoster}`)).status === 200, "a person's other films' posters are served");
+  db.prepare("INSERT INTO person_profiles (tmdb_id, profile, fetched_at) VALUES (237048, ?, ?)").run(JSON.stringify({ ...seedPeople[237048], name: "Pawan Kalyan (stored)" }), new Date().toISOString());
+  check((await call("GET", "/api/people/tmdb/237048")).json?.person.name === "Pawan Kalyan (stored)", "a fetched profile wins over the bundled one");
+  const pkSearch = (await call("GET", "/api/search?q=pawan")).json;
+  check(pkSearch?.persons?.[0]?.tmdbId === 237048 && pkSearch.persons[0].filmsHere === 1, "search finds people credited here, with their page id");
+  check(Array.isArray((await call("GET", "/api/search?q=zzqx")).json?.persons), "search without a TMDB key still answers");
 
   // Database copies in Turso (for hosts that wipe their disk): a local libSQL file stands in for Turso
   const snap = await import("./snapshot.js");

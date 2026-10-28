@@ -7,7 +7,7 @@
 //   GET  /api/movies/:id/credits      full cast and crew from the database
 //   GET  /api/movies/:id/reviews      visible audience reviews
 //   POST /api/movies/:id/reviews      rate a film: { name, stars, text } (one per visitor, a new one replaces it)
-//   GET  /api/search?q=               films whose cast or crew match a name: { movies: [{ id, why }], people: [...] }
+//   GET  /api/search?q=               films whose cast or crew match a name: { movies: [{ id, why }], people: [...], persons: [...] }
 //   GET  /api/people/:id              one person and every film they're credited on
 //   POST /api/messages                the feedback form: { name, email, topic, movieId, message }
 //
@@ -23,6 +23,7 @@ import { rateLimit } from "express-rate-limit";
 import { db, readFilms, readFilm, readCredits, reviewOut, nowISO, todayIST, currentFilmsVersion } from "../db.js";
 import { viewerFrom, ensureViewer, userFrom, userOut, postingProblem, signInMethods } from "../accounts.js";
 import { reviewProblem, messageProblem, NAME_MAX } from "../validate.js";
+import { readPerson, searchPeople } from "../people.js";
 import { listComments, listReplies, addComment, editComment, removeComment, voteComment, commentProblem } from "../comments.js";
 
 export const publicApi = express.Router();
@@ -130,6 +131,16 @@ publicApi.get("/people/:id", (req, res) => {
   });
 });
 
+// A person's page (person.html): their TMDB profile and filmography, by TMDB person ID (stable across
+// databases, unlike our own ids). The first request for someone may wait for TMDB.
+publicApi.get("/people/tmdb/:tmdbId", limit(5, 120, "Too many requests from here. Try again in a few minutes."), async (req, res) => {
+  const id = /^\d{1,9}$/.test(req.params.tmdbId) ? Number(req.params.tmdbId) : null;
+  const person = id && await readPerson(id);
+  if (!person) return res.status(404).json({ error: "That person isn't on MANA CINEMA." });
+  res.set("Cache-Control", "public, max-age=600");
+  res.json({ person, attribution: ATTRIBUTION.tmdb });
+});
+
 publicApi.post("/messages", limit(15, 10, "Too many messages from here. Try again in a few minutes."), (req, res) => {
   const problem = messageProblem(req.body);
   if (problem) return res.status(400).json({ error: problem });
@@ -195,7 +206,7 @@ publicApi.put("/comments/:id/vote", limit(10, 300, "Too many likes from here. Wa
 // The site's search box finds films by title, director, typed cast and language in the browser; this adds the
 // films credited to a person in the database: "pawan kalyan" -> every film he's in, billed leads first.
 const likeEscape = t => t.replace(/[\\%_]/g, c => `\\${c}`);
-publicApi.get("/search", limit(1, 120, "Too many searches. Wait a minute."), (req, res) => {
+publicApi.get("/search", limit(1, 120, "Too many searches. Wait a minute."), async (req, res) => {
   const words = String(req.query.q || "").toLowerCase().normalize("NFKD").replace(/\p{M}/gu, "")
     .split(/[^a-z0-9]+/).filter(Boolean).slice(0, 5);
   if (!words.length || words.join("").length < 2) return res.json({ movies: [], people: [] });
@@ -221,5 +232,16 @@ publicApi.get("/search", limit(1, 120, "Too many searches. Wait a minute."), (re
     movies.push({ id: r.id, why: r.kind === "cast" ? `Cast: ${r.name}${r.character ? ` as ${r.character.split(" / ")[0]}` : ""}` : `${r.job || "Crew"}: ${r.name}` });
     if (movies.length >= 30) break;
   }
-  res.json({ movies, people });
+  // People for the search box: those credited here, then anyone else TMDB finds (with a photo and their
+  // best-known films), each opening their page (person.html)
+  const here = db.prepare(`
+    SELECT p.tmdb_id AS tmdbId, MAX(p.name) AS name, MAX(p.photo) AS photo, COUNT(DISTINCT c.movie_id) AS films
+    FROM people p JOIN credits c ON c.person_id = p.id
+    WHERE p.tmdb_id IS NOT NULL AND ${where} GROUP BY p.tmdb_id ORDER BY films DESC, name LIMIT 6
+  `).all(...args).map(p => ({ tmdbId: p.tmdbId, name: p.name, photo: p.photo ? `img/w185${p.photo}` : null, filmsHere: p.films }));
+  const seenPeople = new Set(here.map(p => p.tmdbId));
+  const tmdbPeople = (await searchPeople(words.join(" ")))
+    .filter(p => !seenPeople.has(p.tmdbId))
+    .map(p => ({ tmdbId: p.tmdbId, name: p.name, photo: p.photo ? `img/w185${p.photo}` : null, knownFor: p.knownFor, films: p.films }));
+  res.json({ movies, people, persons: [...here, ...tmdbPeople].slice(0, 6) });
 });

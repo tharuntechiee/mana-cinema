@@ -1,0 +1,60 @@
+/* =========================================================
+   Person page (person.html): a star's portfolio
+   Builds on css/style.css and css/film.css (the same hero, tabs, sections and cards).
+   ========================================================= */
+
+/* Their photo in a circle, like the home page cover, with its credit under it */
+.person-head { grid-template-columns: minmax(0, 1fr) clamp(200px, 22vw, 280px); }
+.person-photo { margin: 0; display: grid; justify-items: center; gap: 10px; }
+.person-photo img, .person-initials {
+  width: 100%; height: auto; aspect-ratio: 1; border-radius: 50%; object-fit: cover; object-position: center top;
+  border: 3px solid var(--accent); box-shadow: 0 24px 48px -20px rgba(0, 0, 0, .6);
+}
+.person-initials { display: grid; place-items: center; background: var(--surface-2); font-size: 4rem; font-weight: 700; color: var(--text-soft); }
+.person-photo-credit { color: var(--muted); font-size: .75rem; line-height: 1.5; text-align: center; max-width: 30ch; }
+.person-photo-credit a { color: var(--text-soft); text-decoration: underline; text-decoration-color: var(--border-strong); }
+
+.film-ctas .btn { gap: 8px; }
+.film-ctas .btn svg.lucide { width: 18px; height: 18px; flex: 0 0 auto; }
+.person-links { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 18px; font-size: var(--fs-small); font-weight: 600; }
+.person-links a { color: var(--text-soft); text-decoration: underline; text-decoration-color: var(--border-strong); }
+.person-links a:hover { color: var(--text); }
+
+.person-bo-stats { margin-bottom: 24px; }
+.person-role { color: var(--text-soft); overflow-wrap: anywhere; }
+
+/* Biography: a few lines, then "Read more" */
+.person-bio { max-width: 72ch; color: var(--text-soft); line-height: 1.7; }
+.person-bio p + p { margin-top: 12px; }
+.person-bio.is-clamped { max-height: 10.2em; overflow: hidden; -webkit-mask-image: linear-gradient(180deg, #000 60%, transparent); mask-image: linear-gradient(180deg, #000 60%, transparent); }
+.person-more { margin-top: 14px; }
+
+/* Filmography: filter chips, then one row per film */
+.person-filters { margin-bottom: 16px; }
+.chip-count { color: var(--muted); font-variant-numeric: tabular-nums; margin-left: 2px; }
+.chip[aria-pressed="true"] .chip-count { color: inherit; opacity: .7; }
+.person-film-list { list-style: none; border-top: 1px solid var(--border); }
+.person-film { display: grid; grid-template-columns: 4.5rem 46px minmax(0, 1fr); align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.person-film-year { display: grid; color: var(--text-soft); font-weight: 600; font-size: var(--fs-small); font-variant-numeric: tabular-nums; }
+.person-film-year small { color: var(--gold-ink); font-size: .6875rem; font-weight: 600; }
+.person-film-poster { width: 46px; aspect-ratio: 2 / 3; border-radius: 6px; overflow: hidden; background: var(--surface-2); }
+.person-film-poster img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.person-film-info { display: grid; gap: 2px; min-width: 0; }
+.person-film-title { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-weight: 600; overflow-wrap: anywhere; }
+.person-film-title > a:not(.text-link):hover { text-decoration: underline; }
+.person-film-role { color: var(--muted); font-size: var(--fs-label); line-height: 1.45; overflow-wrap: anywhere; }
+.person-onsite {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px;
+  background: rgba(var(--gold-rgb), .16); color: var(--gold-ink); font-size: .6875rem; font-weight: 600;
+}
+.person-onsite svg.lucide { width: 12px; height: 12px; }
+.person-list-foot { display: flex; justify-content: center; margin-top: 20px; }
+
+@media (max-width: 760px) {
+  .person-head { grid-template-columns: 1fr; }
+  .person-photo { order: -1; justify-items: start; }
+  .person-photo img, .person-initials { width: 140px; }
+  .person-photo-credit { text-align: left; }
+  .person-film { grid-template-columns: 3.25rem 40px minmax(0, 1fr); gap: 10px; }
+  .person-film-poster { width: 40px; }
+}

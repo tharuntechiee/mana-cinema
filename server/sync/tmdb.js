@@ -53,7 +53,7 @@ function get(url, headers, timeout) {
 }
 const reason = err => err?.cause?.code || err?.cause?.message || err?.name || "network error";
 
-async function tmdb(pathname, params = {}) {
+export async function tmdb(pathname, params = {}) {
   const url = new URL(API + pathname);
   for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== null && v !== "") url.searchParams.set(k, v);
   const headers = { accept: "application/json" };

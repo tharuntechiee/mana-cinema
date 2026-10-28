@@ -12,6 +12,7 @@
     "dev": "node --watch server/index.js",
     "sync": "node server/sync/cli.js",
     "sync:ratings": "node server/sync/cli.js ratings",
+    "people": "node server/people-cli.js",
     "check": "node server/check.js",
     "backup": "node server/backup.js",
     "turso:push": "node server/snapshot-cli.js push",

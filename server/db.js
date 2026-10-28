@@ -237,6 +237,13 @@ CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
   value TEXT
 ) WITHOUT ROWID;
+
+-- A person's page (person.html): their TMDB biography and whole filmography, trimmed (server/people.js)
+CREATE TABLE IF NOT EXISTS person_profiles (
+  tmdb_id    INTEGER PRIMARY KEY,
+  profile    TEXT    NOT NULL,               -- JSON
+  fetched_at TEXT    NOT NULL
+);
 `);
 
 // Columns added after the first release, for databases made before them

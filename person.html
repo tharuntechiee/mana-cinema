@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="An Indian film star's films, box office and biography: every film, their hits on MANA CINEMA and what's next.">
+  <meta name="theme-color" content="#0F0F13">
+  <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="images/icon-192.png" sizes="192x192" type="image/png">
+  <link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+  <script>document.documentElement.dataset.theme="district"</script>
+  <title>Films, Box Office &amp; Biography | MANA CINEMA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=14">
+  <link rel="stylesheet" href="css/film.css?v=9">
+  <link rel="stylesheet" href="css/person.css?v=2">
+</head>
+<body class="film-page person-page">
+  <a href="#main" class="skip-link">Skip to content</a>
+
+  <nav class="navbar" aria-label="Main">
+    <div class="container nav-inner">
+      <a href="index.html" class="logo" aria-label="MANA CINEMA home"><span class="logo-mark"><i data-lucide="clapperboard"></i></span>MANA&nbsp;<span>CINEMA</span></a>
+      <button class="menu-btn" id="menuBtn" aria-label="Menu" aria-expanded="false" aria-controls="navLinks"><i data-lucide="menu"></i></button>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="index.html#box-office">Box Office</a></li>
+        <li><a href="index.html#films">Films</a></li>
+        <li><a href="lists.html">Lists</a></li>
+        <li><a href="index.html#coming-soon">Coming Soon</a></li>
+        <li><a href="index.html#about">How We Track</a></li>
+        <li><a href="index.html#contact">Feedback</a></li>
+        <li><a href="index.html#box-office" class="btn btn-primary nav-cta"><i data-lucide="trophy"></i> Leaderboard</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Person hero: name, facts and calls to action, their photo, then the section tabs (js/person.js) -->
+  <section class="film-header" aria-label="Person">
+    <div class="film-backdrop" id="personBackdrop" aria-hidden="true"></div>
+    <div class="container">
+      <a href="index.html" class="film-back"><i data-lucide="arrow-left"></i> Home</a>
+      <div class="film-head person-head" id="personHead"><p class="muted">Loading…</p></div>
+      <nav class="film-tabs" id="personTabs" aria-label="On this page" hidden></nav>
+    </div>
+  </section>
+
+  <main id="main">
+    <section class="film-section" id="glance" aria-labelledby="glanceTitle" hidden></section>
+    <section class="film-section" id="box-office" aria-labelledby="boxOfficeTitle" hidden></section>
+    <section class="film-section" id="biography" aria-labelledby="biographyTitle" hidden></section>
+    <section class="film-section" id="filmography" aria-labelledby="filmographyTitle" hidden></section>
+    <section class="film-section" id="sources" aria-labelledby="sourcesTitle" hidden></section>
+  </main>
+
+  <footer>
+    <div class="container footer-bottom film-footer">
+      <span>&copy; 2026 MANA CINEMA · A project-based design · <a href="index.html#credits">Photos via Wikimedia Commons — see photo credits</a> · <a href="privacy.html">Privacy</a></span>
+      <a href="index.html" class="film-footer-back"><i data-lucide="arrow-left"></i> Back to home</a>
+    </div>
+  </footer>
+
+  <script src="api/bootstrap.js"></script>
+  <script src="js/films-india.js?v=4"></script>
+
+  <script src="js/data.js?v=8"></script>
+  <script src="js/art.js?v=6"></script>
+  <script src="js/cover-stars.js?v=8"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js" integrity="sha384-ieG+IKD0d/ZPXyCBTMVAbqsQdns8QGJR/e26WMw7M4fkaI/rHcS/YIoi+ah9WGge" crossorigin="anonymous"></script>
+  <script src="js/ui.js?v=9"></script>
+  <script src="js/account.js?v=3"></script>
+  <script src="js/boxoffice.js?v=6"></script>
+  <script src="js/person.js?v=4"></script>
+</body>
+</html>

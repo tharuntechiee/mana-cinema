@@ -243,19 +243,21 @@ const LEAD_JOB = /^(director|screenplay|writer|story|music|original music compos
 const PHOTO = /^img\/w185\/[A-Za-z0-9]{8,64}\.(jpg|png)$/;
 const photoHTML = (p, size = 88) => (PHOTO.test(p.photo || "")
   ? `<img class="cast-photo" src="${p.photo}" alt="" loading="lazy" decoding="async" width="${size}" height="${size}" onerror="this.remove()">` : "");
+// Someone with a TMDB id opens their page on this site (person.html: their films, box office, biography)
+const personPage = p => (Number.isInteger(p.tmdbId) ? `person.html?id=${p.tmdbId}` : "");
 function personHTML(p) {
-  return `
-    <li class="cast-person">
+  const inner = `
       <span class="cast-avatar" aria-hidden="true">${esc(initials(p.name))}${photoHTML(p)}</span>
       <span class="cast-name">${esc(p.name)}</span>
-      ${p.role ? `<span class="cast-role">${esc(p.role)}</span>` : ""}
-    </li>`;
+      ${p.role ? `<span class="cast-role">${esc(p.role)}</span>` : ""}`;
+  const page = personPage(p);
+  return `<li class="cast-person">${page ? `<a class="cast-link" href="${page}">${inner}</a>` : inner}</li>`;
 }
 
+// Their page here, else IMDb in a new tab
 function personLink(p) {
-  const url = /^nm\d+$/.test(p.imdbId || "") ? `https://www.imdb.com/name/${p.imdbId}/`
-    : Number.isInteger(p.tmdbId) ? `https://www.themoviedb.org/person/${p.tmdbId}` : "";
-  return url ? `<a href="${url}" target="_blank" rel="noopener">${esc(p.name)}${NEW_TAB}</a>` : esc(p.name);
+  if (personPage(p)) return `<a href="${personPage(p)}">${esc(p.name)}</a>`;
+  return /^nm\d+$/.test(p.imdbId || "") ? `<a href="https://www.imdb.com/name/${p.imdbId}/" target="_blank" rel="noopener">${esc(p.name)}${NEW_TAB}</a>` : esc(p.name);
 }
 
 async function loadCredits(sec) {
@@ -267,7 +269,7 @@ async function loadCredits(sec) {
     return;
   }
   const directors = crew.filter(c => /^director$/i.test(c.job));
-  const top = [...directors.map(d => ({ name: d.name, role: "Director", photo: d.photo })), ...cast.slice(0, TOP_BILLED).map(c => ({ name: c.name, role: c.character, photo: c.photo }))];
+  const top = [...directors.map(d => ({ name: d.name, role: "Director", photo: d.photo, tmdbId: d.tmdbId })), ...cast.slice(0, TOP_BILLED).map(c => ({ name: c.name, role: c.character, photo: c.photo, tmdbId: c.tmdbId }))];
   const known = new Set(DEPARTMENTS);
   const groups = DEPARTMENTS
     .map(dep => [dep, crew.filter(c => (known.has(c.department) ? c.department : "Crew") === dep)

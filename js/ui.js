@@ -151,6 +151,32 @@ setTheme(DEFAULT_THEME, false, false);
       </span>
     </a></li>`;
 
+  // People: the home page cover stars at once (where js/cover-stars.js is loaded), then the server's: those
+  // credited here, then anyone TMDB finds. Each opens their page (person.html).
+  const PERSON_PHOTO = /^(images\/heroes\/[\w-]+\.jpg|img\/w185\/[A-Za-z0-9]{8,64}\.(jpg|png))$/;
+  function peopleHits(q, tokens) {
+    const stars = typeof COVER_STARS !== "undefined" && Array.isArray(COVER_STARS) ? COVER_STARS : [];
+    const out = stars.filter(st => Number.isInteger(st.tmdb) && tokens.every(t => fold(st.name).split(" ").some(w => w.startsWith(t))))
+      .map(st => ({ tmdbId: st.tmdb, name: st.name, photo: st.img, line: `${st.lang} star` }));
+    const seen = new Set(out.map(p => p.tmdbId));
+    for (const p of (state.remote && state.remote.q === q ? state.remote.persons : [])) {
+      if (!Number.isInteger(p.tmdbId) || seen.has(p.tmdbId)) continue;
+      seen.add(p.tmdbId);
+      const role = p.knownFor === "Directing" ? "Director" : p.knownFor === "Acting" ? "Actor" : p.knownFor === "Writing" ? "Writer" : p.knownFor === "Sound" ? "Music" : p.knownFor || "";
+      const line = p.filmsHere ? `${p.filmsHere} ${p.filmsHere === 1 ? "film" : "films"} on MANA CINEMA` : (p.films || []).length ? `Known for ${p.films.join(", ")}` : "";
+      out.push({ tmdbId: p.tmdbId, name: p.name, photo: p.photo, line: [role, line].filter(Boolean).join(" · ") });
+    }
+    return out.slice(0, 6);
+  }
+  const personHitHTML = p => `
+    <li><a class="search-hit" href="person.html?id=${Number(p.tmdbId)}">
+      <span class="search-face" aria-hidden="true">${esc(String(p.name).trim().slice(0, 1))}${PERSON_PHOTO.test(p.photo || "") ? `<img src="${p.photo}" alt="" loading="lazy" decoding="async" width="40" height="40" onerror="this.remove()">` : ""}</span>
+      <span class="search-info">
+        <strong>${esc(p.name)}</strong>
+        ${p.line ? `<small>${esc(p.line)}</small>` : ""}
+      </span>
+    </a></li>`;
+
   function render() {
     const q = state.query;
     if (!q) {
@@ -158,7 +184,7 @@ setTheme(DEFAULT_THEME, false, false);
       index = index || build();
       const top = MOVIES.filter(m => typeof isReleased !== "function" || isReleased(m))
         .sort((a, b) => popularity(b) - popularity(a)).slice(0, 6).map(m => ({ m, why: "" }));
-      body.innerHTML = `<p class="search-hint">Search by film title, actor, director, language or year.</p>
+      body.innerHTML = `<p class="search-hint">Search by film title, actor, director, language or year. Actors and directors open their own page.</p>
         ${top.length ? `<h2 class="search-head">Biggest films</h2><ul class="search-list">${top.map(hitHTML).join("")}</ul>` : ""}`;
       status.textContent = "";
       icons();
@@ -181,10 +207,13 @@ setTheme(DEFAULT_THEME, false, false);
       if (m) extra.push({ m, why: r.why });
     }
     const hits = [...local, ...extra].slice(0, MAX_ROWS);
-    body.innerHTML = hits.length
-      ? `<ul class="search-list">${hits.map(hitHTML).join("")}</ul>`
-      : `<p class="search-hint">No films match "${esc(input.value.trim())}". Try a shorter name, or search by an actor, director or language.</p>`;
-    status.textContent = hits.length ? `${hits.length} ${hits.length === 1 ? "result" : "results"}` : "No results";
+    const people = peopleHits(q, tokens);
+    const films = hits.length ? `<ul class="search-list">${hits.map(hitHTML).join("")}</ul>` : "";
+    body.innerHTML = people.length
+      ? `<h2 class="search-head">People</h2><ul class="search-list">${people.map(personHitHTML).join("")}</ul>${films ? `<h2 class="search-head">Films</h2>${films}` : ""}`
+      : films || `<p class="search-hint">No films or people match "${esc(input.value.trim())}". Try a shorter name, or search by an actor, director or language.</p>`;
+    const total = hits.length + people.length;
+    status.textContent = total ? `${total} ${total === 1 ? "result" : "results"}` : "No results";
     icons();
     body.scrollTop = 0;
   }
@@ -199,7 +228,7 @@ setTheme(DEFAULT_THEME, false, false);
       try {
         const data = await api(`search?q=${encodeURIComponent(q)}`);
         if (seq !== state.seq || state.query !== q) return;
-        state.remote = { q, movies: data.movies || [] };
+        state.remote = { q, movies: data.movies || [], persons: data.persons || [] };
         render();
       } catch {}   // the results already shown stay
     }, 220);
